@@ -201,11 +201,40 @@ API endpoints (auto-documented at `http://127.0.0.1:8000/docs`):
 
 ---
 
+## Pre-built index (skip the GPU work)
+
+Building the indexes from scratch takes ~30 minutes of GPU time. If you just want to search, download the pre-built vector indexes from the [GitHub Releases page](https://github.com/GlenProz/Multi-Modal-Semantic-Search-Engine/releases/latest):
+
+- `nga_artworks.parquet` — 145k MiniLM text vectors + metadata
+- `nga_images.parquet` — 63k CLIP image vectors + metadata + movement predictions
+
+Place both files in `data/releases/`, then import:
+
+```powershell
+# fast path: import pre-built index (skip fetch_nga_data + build_index + fetch_images + build_image_index + classify_movements)
+.venv\Scripts\python.exe scripts\import_index.py
+
+# or let the script fetch the files automatically:
+.venv\Scripts\python.exe scripts\import_index.py --download
+```
+
+Then go straight to **Run the API + UI** below. The artwork images are served live from NGA's CDN — no local image files needed.
+
+To export a fresh snapshot of your own indexes (after re-embedding or updating):
+
+```powershell
+# stop uvicorn first (ChromaDB files are locked while the server is running)
+.venv\Scripts\python.exe scripts\export_index.py
+# output: data/releases/nga_artworks.parquet + nga_images.parquet
+```
+
+---
+
 ## Sharing / hosting
 
-Running the full pipeline on your own machine takes about 30 minutes of compute (mostly GPU time for CLIP and the movement classifier). The NGA data is fully open-access, so anyone can rebuild from scratch by following the setup steps above.
+The pre-built index covers the full NGA open-access collection. Anyone can clone the repo, run `import_index.py --download`, and be searching in a few minutes with no GPU required.
 
-A hosted version (no download required) is on the roadmap: export the ChromaDB vectors to a cloud vector DB (Qdrant Cloud or Pinecone), deploy the FastAPI to Railway or Fly.io, and the Streamlit UI to HuggingFace Spaces. Artwork images are already served by NGA's CDN via IIIF URLs, so no image hosting is needed.
+A hosted demo (no download at all) is on the roadmap: migrate to Qdrant Cloud, deploy FastAPI to Railway or Fly.io, Streamlit UI to HuggingFace Spaces. Artwork images are already on NGA's CDN via IIIF URLs, so no image hosting is needed.
 
 ---
 

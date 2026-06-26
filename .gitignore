@@ -13,10 +13,11 @@ venv/
 .env.*
 !.env.example
 
-# Data + artifacts (large, regenerable)
+# Data + artifacts (large, regenerable or distributed via GitHub Releases)
 data/raw/
 data/images/
 data/chroma/
+data/releases/
 data/*.parquet
 *.sqlite
 *.db
