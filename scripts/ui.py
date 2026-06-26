@@ -92,6 +92,18 @@ if query:
                     f"{m.get('date', '')} · {m.get('classification', '')}\n\n"
                     f"score: `{hit['score']:.3f}`"
                 )
+                pred = m.get("pred_movement")
+                if pred:
+                    conf = m.get("pred_confidence", 0.0)
+                    dot = "🟢" if conf >= 0.75 else ("🟡" if conf >= 0.40 else "🔴")
+                    warn = " ⚠️" if m.get("pred_anachronistic") else ""
+                    pretty = pred.replace("_", " ")
+                    st.markdown(f"{dot} **{pretty}** `{conf:.2f}`{warn}")
+                    if conf < 0.40 and m.get("pred_alt1"):
+                        st.caption(
+                            f"or: {m['pred_alt1'].replace('_', ' ')} `{m.get('pred_alt1_conf', 0):.2f}` · "
+                            f"{m.get('pred_alt2', '').replace('_', ' ')} `{m.get('pred_alt2_conf', 0):.2f}`"
+                        )
     else:
         for hit in results:
             m = hit["metadata"]
