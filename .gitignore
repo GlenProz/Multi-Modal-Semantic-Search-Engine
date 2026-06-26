@@ -30,3 +30,6 @@ data/*.parquet
 Thumbs.db
 .vscode/
 .idea/
+
+# Claude Code project settings (local only)
+.claude/
