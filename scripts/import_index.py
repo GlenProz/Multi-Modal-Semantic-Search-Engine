@@ -68,7 +68,6 @@ def import_collection(name: str, parquet_path: Path) -> None:
     metadatas = [json.loads(m) for m in table["metadata_json"].to_pylist()]
 
     coll = get_collection(name)
-    existing = set(coll.get(ids=ids[:1], include=[])["ids"])  # quick probe
     if coll.count() > 0:
         print(f"[import] {name}: collection already has {coll.count():,} rows — skipping", flush=True)
         return
