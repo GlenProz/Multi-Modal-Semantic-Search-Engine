@@ -19,6 +19,8 @@ open-clip-torch>=3.3
 pillow>=11
 httpx>=0.28
 
-# Phase 3
-# streamlit>=1.36
+# Phase 3 — UI
+streamlit>=1.36
+
+# Phase 3+ (deferred)
 # psycopg[binary]>=3.2
