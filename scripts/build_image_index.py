@@ -18,9 +18,16 @@ def main() -> None:
     df = pd.read_parquet(DATA_DIR / "image_sample.parquet")
     df["path"] = df["uuid"].apply(lambda u: IMAGES_DIR / f"{u}.jpg")
     df = df[df["path"].apply(lambda p: p.exists() and p.stat().st_size > 0)].reset_index(drop=True)
-    print(f"embedding {len(df):,} images")
 
     coll = get_collection(COLLECTION)
+    existing_ids: set[str] = set()
+    for start in range(0, len(df), 1000):
+        ids = df["uuid"].iloc[start:start + 1000].tolist()
+        existing_ids.update(coll.get(ids=ids, include=[])["ids"])
+    if existing_ids:
+        df = df[~df["uuid"].isin(existing_ids)].reset_index(drop=True)
+        print(f"skipping {len(existing_ids):,} already-embedded")
+    print(f"embedding {len(df):,} new images")
 
     for start in tqdm(range(0, len(df), BATCH), desc="batches"):
         chunk = df.iloc[start:start + BATCH]

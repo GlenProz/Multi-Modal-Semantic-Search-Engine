@@ -1,11 +1,15 @@
 """Async-download a sample of NGA IIIF thumbnails to data/images/.
 
-Usage: python scripts/fetch_images.py [N=5000]
+Usage: python scripts/fetch_images.py [N=5000] [--seed SEED]
+
+Skips UUIDs already present in image_sample.parquet so repeated runs grow the
+sample instead of repeating it.
 """
 from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+import pandas as pd
 import httpx
 from tqdm import tqdm
 
@@ -15,6 +19,7 @@ from multimodal_search.ingest.images import sample_image_rows
 
 CONCURRENCY = 16
 TIMEOUT = 30.0
+SAMPLE_PARQUET = IMAGES_DIR.parent / "image_sample.parquet"
 
 
 async def _fetch(client: httpx.AsyncClient, sem: asyncio.Semaphore, uuid: str, url: str, pbar) -> tuple[str, bool]:
@@ -48,12 +53,23 @@ async def _run(df) -> dict[str, bool]:
 
 def main() -> None:
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
-    df = sample_image_rows(n)
-    df.to_parquet(IMAGES_DIR.parent / "image_sample.parquet", index=False)
-    print(f"sampled {len(df):,} rows -> {IMAGES_DIR}")
-    results = asyncio.run(_run(df))
+    seed = 42
+    if "--seed" in sys.argv:
+        seed = int(sys.argv[sys.argv.index("--seed") + 1])
+
+    existing = pd.read_parquet(SAMPLE_PARQUET) if SAMPLE_PARQUET.exists() else None
+    exclude = set(existing["uuid"]) if existing is not None else set()
+    print(f"existing sample: {len(exclude):,} rows; requesting {n:,} new")
+
+    new_df = sample_image_rows(n, seed=seed, exclude=exclude)
+    print(f"sampled {len(new_df):,} new rows -> {IMAGES_DIR}")
+    results = asyncio.run(_run(new_df))
     ok = sum(results.values())
-    print(f"downloaded {ok:,}/{len(df):,} (failed: {len(df) - ok})")
+    print(f"downloaded {ok:,}/{len(new_df):,} (failed: {len(new_df) - ok})")
+
+    combined = pd.concat([existing, new_df], ignore_index=True) if existing is not None else new_df
+    combined.to_parquet(SAMPLE_PARQUET, index=False)
+    print(f"total sample: {len(combined):,} rows")
 
 
 if __name__ == "__main__":

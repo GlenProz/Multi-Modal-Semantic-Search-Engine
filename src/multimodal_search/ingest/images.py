@@ -4,11 +4,13 @@ import pandas as pd
 from ..config import RAW_DIR
 
 
-def sample_image_rows(n: int, seed: int = 42) -> pd.DataFrame:
+def sample_image_rows(n: int, seed: int = 42, exclude: set[str] | None = None) -> pd.DataFrame:
     imgs = pd.read_csv(RAW_DIR / "published_images.csv", low_memory=False)
     imgs = imgs[(imgs["openaccess"] == 1) & (imgs["viewtype"] == "primary")]
     imgs = imgs.dropna(subset=["iiifthumburl", "depictstmsobjectid"])
     imgs = imgs.drop_duplicates(subset=["depictstmsobjectid"])
+    if exclude:
+        imgs = imgs[~imgs["uuid"].isin(exclude)]
 
     objects = pd.read_csv(RAW_DIR / "objects.csv", low_memory=False)
     df = imgs.merge(
