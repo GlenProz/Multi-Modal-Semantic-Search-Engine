@@ -7,9 +7,8 @@ ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
     HF_HOME=/home/user/.cache/huggingface \
     DATA_DIR=/home/user/app/data \
-    CHROMA_DIR=/home/user/app/data/chroma \
     RELEASES_DIR=/home/user/app/data/releases \
-    ANONYMIZED_TELEMETRY=False \
+    USE_MEMORY_STORE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /home/user/app
@@ -23,13 +22,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Source, index-build script, and the exported parquet index.
+# Source and the exported parquet index. The NumPy-backed store loads the
+# parquet into memory at startup — no ChromaDB, no build-time index build
+# (that OOM'd the free build machine for 271k vectors).
 COPY --chown=user src ./src
-COPY --chown=user build_chroma.py .
 COPY --chown=user data/releases ./data/releases
-
-# Bake the ChromaDB index into the image (no cold-start rebuild).
-RUN python build_chroma.py
 
 # Pre-fetch the query-time model weights so cold starts don't re-download.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')" && \

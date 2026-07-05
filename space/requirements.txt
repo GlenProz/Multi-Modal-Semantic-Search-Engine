@@ -1,7 +1,7 @@
 # Runtime deps for the Hugging Face Space (CPU). torch/torchvision are
 # installed separately from the CPU wheel index in the Dockerfile.
-# Pinned to match the environment the parquet index was exported from.
-chromadb==1.5.9
+# No chromadb — the Space uses the NumPy-backed in-memory store
+# (src/multimodal_search/store/memory.py) loaded from parquet at startup.
 sentence-transformers==5.6.0
 open-clip-torch>=3.3
 fastapi==0.138.1
