@@ -12,6 +12,12 @@ All three indexes live in local ChromaDB, served by a FastAPI app, with a Stream
 
 ---
 
+## Problem
+
+A museum catalog can only be searched with the words a cataloguer already typed into it. The NGA's open dataset describes its collection across 17 relational tables in the vocabulary of title, attribution, medium, dimensions and provenance — none of which records what a work looks like or how it feels. So *"moody European rainy-day landscapes"* returns nothing on keyword match, even though the collection plainly contains such works, and the same is true of every query phrased the way a person actually thinks about art. The information needed to answer it is in the pixels and in the *meaning* of the record rather than its literal words, which is why this builds two indexes instead of one.
+
+---
+
 ## Stack
 
 | Layer | Choice |
@@ -105,7 +111,22 @@ data/
   raw/         # NGA CSVs (gitignored)
   images/      # downloaded IIIF thumbnails (gitignored)
   chroma/      # local vector DB (gitignored)
+  releases/    # exported .parquet index snapshots (gitignored; see Pre-built index)
+
+space/         # the hosted backend, packaged for a Hugging Face Space
+  Dockerfile   # builds the image; bakes the ChromaDB index in at build time
+  build_chroma.py  # rebuilds that index from the release parquets
+
+web/           # the public frontend: Next.js on Vercel, Root Directory = web
+  app/api/     # route handlers that proxy to the Space, so the backend URL
+               # stays server-side and cold starts are absorbed
+  components/  # ArtworkCard, MovementBadge
+  lib/         # api.ts — server-only typed client those routes call
 ```
+
+`space/` and `web/` are the deployed pair: the ML models need multi-GB PyTorch
+weights and cannot run on Vercel, so they run in the Space and the Next.js app
+is a thin styled layer over it. Each has its own README.
 
 ---
 
