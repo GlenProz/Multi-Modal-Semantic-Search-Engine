@@ -46,11 +46,13 @@ export function ArtworkCard({ result, onFindSimilar }: Props) {
           </span>
         </div>
 
-        <MovementBadge
-          movement={m.pred_movement}
-          confidence={m.pred_confidence}
-          anachronistic={m.pred_anachronistic}
-        />
+        {m.pred_movement ? (
+          <MovementBadge
+            movement={m.pred_movement}
+            confidence={m.pred_confidence}
+            anachronistic={m.pred_anachronistic}
+          />
+        ) : null}
 
         <button
           onClick={() => onFindSimilar(result.uuid)}

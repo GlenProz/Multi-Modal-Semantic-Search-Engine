@@ -31,11 +31,14 @@ def main() -> None:
 
     for start in tqdm(range(0, len(df), BATCH), desc="batches"):
         chunk = df.iloc[start:start + BATCH]
-        vecs = encode_images(chunk["path"].tolist())
+        valid_idx, vecs = encode_images(chunk["path"].tolist())
+        if not valid_idx:
+            continue
+        valid_chunk = chunk.iloc[valid_idx]
         coll.upsert(
-            ids=chunk["uuid"].tolist(),
+            ids=valid_chunk["uuid"].tolist(),
             embeddings=[v.tolist() for v in vecs],
-            documents=chunk["title"].fillna("").astype(str).tolist(),
+            documents=valid_chunk["title"].fillna("").astype(str).tolist(),
             metadatas=[
                 {
                     "objectid": int(r.objectid),
@@ -46,7 +49,7 @@ def main() -> None:
                     "medium": str(r.medium) if pd.notna(r.medium) else "",
                     "iiif": f"https://api.nga.gov/iiif/{r.uuid}/full/!600,600/0/default.jpg",
                 }
-                for r in chunk.itertuples(index=False)
+                for r in valid_chunk.itertuples(index=False)
             ],
         )
 

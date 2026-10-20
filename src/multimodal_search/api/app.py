@@ -34,14 +34,17 @@ def health():
 
 
 @app.get("/search/text")
-def search_text(q: str, k: int = 10):
+def search_text(
+    q: str = Query(..., min_length=1, max_length=500),
+    k: int = Query(default=10, ge=1, le=100),
+):
     return {"query": q, "mode": "text", "results": text_search(q, k=k)}
 
 
 @app.get("/search/images")
 def search_images(
-    q: str,
-    k: int = 10,
+    q: str = Query(..., min_length=1, max_length=500),
+    k: int = Query(default=10, ge=1, le=100),
     movements: Optional[str] = Query(default=None, description="Comma-separated movement filter, e.g. baroque,realism"),
 ):
     vec = encode_texts([q])[0].tolist()
@@ -68,10 +71,21 @@ def search_images(
 
 
 @app.get("/search/visual")
-def search_visual(id: str, k: int = 10):
+def search_visual(
+    id: str = Query(..., min_length=1),
+    k: int = Query(default=10, ge=1, le=100),
+):
     """Find artworks that visually resemble the given artwork (DINOv2 structural similarity)."""
-    coll = get_collection("nga_dino")
-    seed = coll.get(ids=[id], include=["embeddings", "metadatas"])
+    try:
+        coll = get_collection("nga_dino")
+    except (FileNotFoundError, Exception):
+        raise HTTPException(503, "DINOv2 visual similarity index is not available")
+
+    try:
+        seed = coll.get(ids=[id], include=["embeddings", "metadatas"])
+    except Exception as e:
+        raise HTTPException(500, f"Failed to retrieve seed artwork: {e}")
+
     if not seed["ids"]:
         raise HTTPException(404, f"UUID {id!r} not found in DINOv2 index")
     vec = seed["embeddings"][0]

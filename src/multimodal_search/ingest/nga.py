@@ -39,12 +39,12 @@ def build_artwork_documents() -> pd.DataFrame:
             row.get("medium"),
             row.get("classification"),
             row.get("subclassification"),
+            row.get("assistivetext"),
             row.get("attribution"),
             row.get("attributioninverted"),
             row.get("visualbrowsertimespan"),
             row.get("visualbrowserclassification"),
             row.get("provenancetext"),
-            row.get("assistivetext"),
         ]
         return " | ".join(str(p).strip() for p in parts if pd.notna(p) and str(p).strip())
 
