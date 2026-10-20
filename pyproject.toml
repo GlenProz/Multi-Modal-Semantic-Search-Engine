@@ -19,3 +19,12 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["multimodal_search"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
