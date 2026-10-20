@@ -29,7 +29,7 @@ RELEASE_URL = (
     "https://github.com/GlenProz/Multi-Modal-Semantic-Search-Engine"
     "/releases/latest/download"
 )
-FILES = ["nga_artworks.parquet", "nga_images.parquet"]
+FILES = ["nga_artworks.parquet", "nga_images.parquet", "nga_dino.parquet"]
 
 BATCH = 2_000
 
@@ -43,17 +43,23 @@ def download_files() -> None:
             continue
         url = f"{RELEASE_URL}/{fname}"
         print(f"[download] {url}", flush=True)
-        with httpx.stream("GET", url, follow_redirects=True, timeout=300) as r:
-            r.raise_for_status()
-            total = int(r.headers.get("content-length", 0))
-            done = 0
-            with open(dest, "wb") as f:
-                for chunk in r.iter_bytes(chunk_size=1 << 20):
-                    f.write(chunk)
-                    done += len(chunk)
-                    if total:
-                        print(f"  {done / 1_048_576:.1f} / {total / 1_048_576:.1f} MB", flush=True)
-        print(f"  saved {dest}", flush=True)
+        try:
+            with httpx.stream("GET", url, follow_redirects=True, timeout=300) as r:
+                if r.status_code == 404:
+                    print(f"  [skip] {fname} not found in release (optional)", flush=True)
+                    continue
+                r.raise_for_status()
+                total = int(r.headers.get("content-length", 0))
+                done = 0
+                with open(dest, "wb") as f:
+                    for chunk in r.iter_bytes(chunk_size=1 << 20):
+                        f.write(chunk)
+                        done += len(chunk)
+                        if total:
+                            print(f"  {done / 1_048_576:.1f} / {total / 1_048_576:.1f} MB", flush=True)
+            print(f"  saved {dest}", flush=True)
+        except Exception as e:
+            print(f"  [warn] failed to download {fname}: {e}", flush=True)
 
 
 def import_collection(name: str, parquet_path: Path) -> None:
@@ -66,6 +72,7 @@ def import_collection(name: str, parquet_path: Path) -> None:
     ids = table["id"].to_pylist()
     embeddings = [list(e) for e in table["embedding"].to_pylist()]
     metadatas = [json.loads(m) for m in table["metadata_json"].to_pylist()]
+    docs = table["document"].to_pylist() if "document" in table.column_names else None
 
     coll = get_collection(name)
     if coll.count() > 0:
@@ -76,11 +83,14 @@ def import_collection(name: str, parquet_path: Path) -> None:
     print(f"[import] {name}: {total:,} rows", flush=True)
     for start in range(0, total, BATCH):
         end = min(start + BATCH, total)
-        coll.add(
-            ids=ids[start:end],
-            embeddings=embeddings[start:end],
-            metadatas=metadatas[start:end],
-        )
+        kwargs = {
+            "ids": ids[start:end],
+            "embeddings": embeddings[start:end],
+            "metadatas": metadatas[start:end],
+        }
+        if docs is not None:
+            kwargs["documents"] = docs[start:end]
+        coll.add(**kwargs)
         print(f"  {end:,}/{total:,}", flush=True)
     print(f"[import] {name}: done", flush=True)
 
@@ -95,6 +105,11 @@ def main() -> None:
 
     import_collection("nga_artworks", RELEASES_DIR / "nga_artworks.parquet")
     import_collection("nga_images",   RELEASES_DIR / "nga_images.parquet")
+    dino_path = RELEASES_DIR / "nga_dino.parquet"
+    if dino_path.exists():
+        import_collection("nga_dino", dino_path)
+    else:
+        print("[import] nga_dino.parquet not found — skipping DINOv2 import", flush=True)
     print("[import] all done — run uvicorn + streamlit to start searching", flush=True)
 
 

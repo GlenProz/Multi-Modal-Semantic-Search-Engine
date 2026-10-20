@@ -38,12 +38,24 @@ _FILES = {
 
 class MemoryCollection:
     def __init__(self, name: str):
+        if name not in _FILES:
+            raise ValueError(f"Unknown collection name {name!r}")
         path = RELEASES_DIR / _FILES[name]
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Parquet file for collection {name!r} not found at {path}"
+            )
         table = pq.read_table(path)
         self.ids: list[str] = [str(x) for x in table.column("id").to_pylist()]
         self.metas: list[dict] = [
             json.loads(x) for x in table.column("metadata_json").to_pylist()
         ]
+        if "document" in table.column_names:
+            self.docs: list[str | None] = [
+                str(x) if x is not None else None for x in table.column("document").to_pylist()
+            ]
+        else:
+            self.docs = [None] * len(self.ids)
         embs = np.asarray(table.column("embedding").to_pylist(), dtype=np.float32)
         norms = np.linalg.norm(embs, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
@@ -87,7 +99,7 @@ class MemoryCollection:
         else:
             cand = np.arange(len(self.ids))
 
-        if cand.size == 0:
+        if n_results <= 0 or cand.size == 0:
             return {"ids": [[]], "distances": [[]], "metadatas": [[]], "documents": [[]]}
 
         k = min(n_results, cand.size)
@@ -100,7 +112,7 @@ class MemoryCollection:
             "ids": [[self.ids[i] for i in top]],
             "distances": [[float(1.0 - sims[i]) for i in top]],
             "metadatas": [[self.metas[i] for i in top]],
-            "documents": [[None for _ in top]],
+            "documents": [[self.docs[i] for i in top]],
         }
 
     def get(self, ids=None, include=None, **_):
@@ -115,6 +127,8 @@ class MemoryCollection:
             out["embeddings"] = [self.embs[i].tolist() for i in idxs]
         if "metadatas" in include:
             out["metadatas"] = [self.metas[i] for i in idxs]
+        if "documents" in include:
+            out["documents"] = [self.docs[i] for i in idxs]
         return out
 
 

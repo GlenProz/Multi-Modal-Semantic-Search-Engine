@@ -6,6 +6,7 @@ tqdm>=4.66
 python-dotenv>=1.0
 
 sentence-transformers>=3.0
+transformers>=4.40
 chromadb>=0.5
 
 fastapi>=0.115

@@ -34,17 +34,21 @@ def export_collection(name: str, out_path: Path) -> None:
     total = coll.count()
     print(f"[export] {name}: {total:,} rows -> {out_path.name}", flush=True)
 
-    ids_all, embeddings_all, metadata_all = [], [], []
+    ids_all, embeddings_all, metadata_all, documents_all = [], [], [], []
     offset = 0
     while offset < total:
         page = coll.get(
             limit=PAGE,
             offset=offset,
-            include=["embeddings", "metadatas"],
+            include=["embeddings", "metadatas", "documents"],
         )
         ids_all.extend(page["ids"])
         embeddings_all.extend(page["embeddings"])
         metadata_all.extend(page["metadatas"])
+        docs = page.get("documents") or []
+        if len(docs) < len(page["ids"]):
+            docs = list(docs) + [""] * (len(page["ids"]) - len(docs))
+        documents_all.extend([d or "" for d in docs])
         offset += len(page["ids"])
         print(f"  {offset:,}/{total:,}", flush=True)
         if not page["ids"]:
@@ -54,12 +58,14 @@ def export_collection(name: str, out_path: Path) -> None:
         "id": ids_all,
         "embedding": embeddings_all,
         "metadata_json": [json.dumps(m or {}) for m in metadata_all],
+        "document": documents_all,
     })
 
     schema = pa.schema([
         pa.field("id", pa.string()),
         pa.field("embedding", pa.list_(pa.float32())),
         pa.field("metadata_json", pa.string()),
+        pa.field("document", pa.string()),
     ])
     table = pa.Table.from_pandas(df, schema=schema)
     pq.write_table(table, out_path, compression="snappy")
@@ -70,6 +76,14 @@ def export_collection(name: str, out_path: Path) -> None:
 def main() -> None:
     export_collection("nga_artworks", RELEASES_DIR / "nga_artworks.parquet")
     export_collection("nga_images",   RELEASES_DIR / "nga_images.parquet")
+    try:
+        dino_coll = get_collection("nga_dino")
+        if dino_coll.count() > 0:
+            export_collection("nga_dino", RELEASES_DIR / "nga_dino.parquet")
+        else:
+            print("[export] nga_dino is empty — skipping", flush=True)
+    except Exception as e:
+        print(f"[export] nga_dino skipped ({e})", flush=True)
     print("[export] done", flush=True)
 
 
