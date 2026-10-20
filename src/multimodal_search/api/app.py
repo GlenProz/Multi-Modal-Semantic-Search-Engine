@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..search.query import search as text_search
+from ..search.hybrid import hybrid_search
 from ..embed.clip import encode_texts
 from ..store.chroma import get_collection
 
@@ -68,6 +69,27 @@ def search_images(
         for i in range(len(res["ids"][0]))
     ]
     return {"query": q, "mode": "image", "results": out}
+
+
+@app.get("/search/hybrid")
+def search_hybrid(
+    q: str = Query(..., min_length=1, max_length=500),
+    k: int = Query(default=10, ge=1, le=100),
+    w_text: float = Query(default=0.5, ge=0.0, le=1.0),
+    w_image: float = Query(default=0.5, ge=0.0, le=1.0),
+    movements: Optional[str] = Query(default=None, description="Comma-separated movement filter"),
+    exclude_anachronistic: bool = Query(default=False, description="Exclude historically anachronistic results"),
+):
+    mvlist = [m.strip() for m in movements.split(",") if m.strip()] if movements else None
+    results = hybrid_search(
+        query=q,
+        k=k,
+        w_text=w_text,
+        w_image=w_image,
+        movements=mvlist,
+        exclude_anachronistic=exclude_anachronistic,
+    )
+    return {"query": q, "mode": "hybrid", "results": results}
 
 
 @app.get("/search/visual")

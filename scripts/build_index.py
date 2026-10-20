@@ -31,6 +31,7 @@ def main() -> None:
                     "date": str(r.displaydate) if pd.notna(r.displaydate) else "",
                     "classification": str(r.classification) if pd.notna(r.classification) else "",
                     "medium": str(r.medium) if pd.notna(r.medium) else "",
+                    "iiif": str(r.iiif) if pd.notna(r.iiif) else "",
                 }
                 for r in chunk.itertuples(index=False)
             ],
