@@ -3,7 +3,8 @@
 Usage: python scripts/fetch_images.py [N=5000] [--seed SEED]
 
 Skips UUIDs already present in image_sample.parquet so repeated runs grow the
-sample instead of repeating it.
+sample instead of repeating it. Only successfully downloaded images are saved
+so failed downloads can be retried.
 """
 from __future__ import annotations
 import asyncio
@@ -22,7 +23,13 @@ TIMEOUT = 30.0
 SAMPLE_PARQUET = IMAGES_DIR.parent / "image_sample.parquet"
 
 
-async def _fetch(client: httpx.AsyncClient, sem: asyncio.Semaphore, uuid: str, url: str, pbar) -> tuple[str, bool]:
+async def _fetch(
+    client: httpx.AsyncClient,
+    sem: asyncio.Semaphore,
+    uuid: str,
+    url: str,
+    pbar: tqdm,
+) -> tuple[str, bool]:
     dest = IMAGES_DIR / f"{uuid}.jpg"
     if dest.exists() and dest.stat().st_size > 0:
         pbar.update(1)
@@ -39,7 +46,7 @@ async def _fetch(client: httpx.AsyncClient, sem: asyncio.Semaphore, uuid: str, u
         return uuid, ok
 
 
-async def _run(df) -> dict[str, bool]:
+async def _run(df: pd.DataFrame) -> dict[str, bool]:
     sem = asyncio.Semaphore(CONCURRENCY)
     results: dict[str, bool] = {}
     async with httpx.AsyncClient(headers={"User-Agent": "nga-semantic-search/0.1"}) as client:
@@ -52,7 +59,7 @@ async def _run(df) -> dict[str, bool]:
 
 
 def main() -> None:
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
+    n = int(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else 5000
     seed = 42
     if "--seed" in sys.argv:
         seed = int(sys.argv[sys.argv.index("--seed") + 1])
@@ -67,9 +74,19 @@ def main() -> None:
     ok = sum(results.values())
     print(f"downloaded {ok:,}/{len(new_df):,} (failed: {len(new_df) - ok})")
 
-    combined = pd.concat([existing, new_df], ignore_index=True) if existing is not None else new_df
-    combined.to_parquet(SAMPLE_PARQUET, index=False)
-    print(f"total sample: {len(combined):,} rows")
+    # Only append successfully downloaded rows to image_sample.parquet
+    # so that any network failures can be retried on subsequent runs
+    succeeded_df = new_df[new_df["uuid"].map(results).fillna(False)].copy()
+    if len(succeeded_df) > 0:
+        combined = (
+            pd.concat([existing, succeeded_df], ignore_index=True)
+            if existing is not None
+            else succeeded_df
+        )
+        combined.to_parquet(SAMPLE_PARQUET, index=False)
+        print(f"total sample: {len(combined):,} rows")
+    else:
+        print("no new images were successfully downloaded")
 
 
 if __name__ == "__main__":
