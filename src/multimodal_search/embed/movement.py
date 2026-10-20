@@ -22,14 +22,66 @@ MOVEMENT_DATES: dict[str, tuple[int, int]] = {
     "surrealism": (1924, 1955),
 }
 
-_YEAR_RE = re.compile(r"\b(1[3-9]\d{2}|20\d{2})\b")
+_BCE_EXPLICIT_RE = re.compile(r"\b(?:b\.?c\.?e?|b\.?c\.?)\b", re.IGNORECASE)
+_CENTURY_INDICATOR_RE = re.compile(r"\bcen(?:tury|turies|\.)?\b", re.IGNORECASE)
+_ORDINAL_RE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
+_CENTURY_WORD_RE = re.compile(
+    r"\b(twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth)[-\s]+cen",
+    re.IGNORECASE,
+)
+_WORD_TO_CENTURY = {
+    "twelfth": 12,
+    "thirteenth": 13,
+    "fourteenth": 14,
+    "fifteenth": 15,
+    "sixteenth": 16,
+    "seventeenth": 17,
+    "eighteenth": 18,
+    "nineteenth": 19,
+    "twentieth": 20,
+}
+_YEAR_BCE_RE = re.compile(r"\b(\d{1,4})\s*(?:b\.?c\.?e?|b\.?c\.?)\b", re.IGNORECASE)
+_YEAR_RE = re.compile(r"\b(\d{3,4})s?\b")
 
 
 def extract_year(s: str | None) -> int | None:
+    """Extract a representative historical year from display date strings.
+
+    Supports:
+      - Standard 3-4 digit years (e.g. "1920", "c. 1275", "800")
+      - Decades (e.g. "1860s" -> 1860)
+      - Century notation (e.g. "15th century" -> 1450, "nineteenth century" -> 1850)
+      - BCE dates as negative years (e.g. "c. 490 B.C." -> -490, "4th century B.C." -> -350)
+    """
     if not s:
         return None
-    m = _YEAR_RE.search(str(s))
-    return int(m.group(1)) if m else None
+    s_str = str(s).strip()
+    is_bce = bool(_BCE_EXPLICIT_RE.search(s_str))
+
+    # 1. Explicit BCE year: "490 B.C.", "50 BCE"
+    m_bce = _YEAR_BCE_RE.search(s_str)
+    if m_bce:
+        return -int(m_bce.group(1))
+
+    # 2. Century notation (digits or words, including composite spans)
+    cents: list[int] = []
+    if _CENTURY_INDICATOR_RE.search(s_str):
+        cents.extend(int(c) for c in _ORDINAL_RE.findall(s_str))
+    for w in _CENTURY_WORD_RE.findall(s_str):
+        cents.append(_WORD_TO_CENTURY[w.lower()])
+    if cents:
+        avg_c = sum(cents) / len(cents)
+        yr = int((avg_c - 1) * 100 + 50)
+        return -yr if is_bce else yr
+
+    # 3. Standard 3-4 digit years and decades: "1920", "1860s", "c. 1275", "800"
+    m_yr = _YEAR_RE.search(s_str)
+    if m_yr:
+        yr = int(m_yr.group(1))
+        if 1 <= yr <= 2100:
+            return -yr if is_bce else yr
+
+    return None
 
 
 def is_plausible(movement: str, year: int | None, slack: int = 25) -> bool:

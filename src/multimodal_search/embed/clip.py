@@ -20,30 +20,36 @@ def _load():
 
 
 @torch.no_grad()
-def encode_images(paths: list[Path], batch_size: int = 64) -> torch.Tensor:
+def encode_images(paths: list[Path], batch_size: int = 64) -> tuple[list[int], torch.Tensor]:
+    """Return (valid_indices, embeddings).
+
+    valid_indices maps output rows back to input positions — images that fail
+    to load or decode are skipped rather than filled with zeros.
+    """
     model, preprocess, _, device = _load()
-    out = []
-    for i in range(0, len(paths), batch_size):
-        batch = paths[i:i + batch_size]
-        imgs = []
-        for p in batch:
+    all_vecs: list[torch.Tensor] = []
+    all_valid: list[int] = []
+
+    for start in range(0, len(paths), batch_size):
+        batch = paths[start:start + batch_size]
+        imgs, valid = [], []
+        for j, p in enumerate(batch):
             try:
                 imgs.append(preprocess(Image.open(p).convert("RGB")))
+                valid.append(start + j)
             except Exception:
-                imgs.append(None)
-        keep = [(j, t) for j, t in enumerate(imgs) if t is not None]
-        if not keep:
-            out.append(torch.zeros(len(batch), 512))
+                pass
+        if not imgs:
             continue
-        idx, tensors = zip(*keep)
-        x = torch.stack(tensors).to(device)
+        x = torch.stack(imgs).to(device)
         feats = model.encode_image(x)
         feats = feats / feats.norm(dim=-1, keepdim=True)
-        full = torch.zeros(len(batch), feats.shape[1], device=device)
-        for k, j in enumerate(idx):
-            full[j] = feats[k]
-        out.append(full.cpu())
-    return torch.cat(out, dim=0)
+        all_vecs.append(feats.cpu())
+        all_valid.extend(valid)
+
+    if not all_vecs:
+        return [], torch.empty(0, 512)
+    return all_valid, torch.cat(all_vecs, dim=0)
 
 
 @torch.no_grad()

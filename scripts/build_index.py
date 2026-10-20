@@ -2,6 +2,7 @@
 from __future__ import annotations
 import sys
 from pathlib import Path
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from multimodal_search.ingest.nga import build_artwork_documents
@@ -25,11 +26,11 @@ def main() -> None:
             documents=chunk["document"].tolist(),
             metadatas=[
                 {
-                    "title": str(r.title) if r.title else "",
-                    "artists": str(r.artists) if r.artists else "",
-                    "date": str(r.displaydate) if r.displaydate else "",
-                    "classification": str(r.classification) if r.classification else "",
-                    "medium": str(r.medium) if r.medium else "",
+                    "title": str(r.title) if pd.notna(r.title) else "",
+                    "artists": str(r.artists) if pd.notna(r.artists) else "",
+                    "date": str(r.displaydate) if pd.notna(r.displaydate) else "",
+                    "classification": str(r.classification) if pd.notna(r.classification) else "",
+                    "medium": str(r.medium) if pd.notna(r.medium) else "",
                 }
                 for r in chunk.itertuples(index=False)
             ],
