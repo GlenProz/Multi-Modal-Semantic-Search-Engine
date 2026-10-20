@@ -1,7 +1,7 @@
 type Props = {
-  movement: string;
-  confidence: number;
-  anachronistic: boolean;
+  movement?: string | null;
+  confidence?: number | null;
+  anachronistic?: boolean | null;
 };
 
 // Confidence tiers mirror the project's 🟢/🟡/🔴 semantics: how much to trust
@@ -17,7 +17,11 @@ function prettyMovement(m: string): string {
 }
 
 export function MovementBadge({ movement, confidence, anachronistic }: Props) {
-  const style = confidenceStyle(confidence);
+  if (!movement) {
+    return null;
+  }
+  const conf = confidence ?? 0;
+  const style = confidenceStyle(conf);
   return (
     <div className="flex items-center gap-1.5 text-xs">
       <span className={`h-2 w-2 rounded-full ${style.dot}`} />
@@ -25,9 +29,9 @@ export function MovementBadge({ movement, confidence, anachronistic }: Props) {
         {prettyMovement(movement)}
       </span>
       <span className="text-zinc-400 dark:text-zinc-500">
-        {Math.round(confidence * 100)}%
+        {Math.round(conf * 100)}%
       </span>
-      {anachronistic && (
+      {Boolean(anachronistic) && (
         <span
           title="Historically anachronistic — the movement label falls outside this artwork's date range"
           className="text-amber-500"

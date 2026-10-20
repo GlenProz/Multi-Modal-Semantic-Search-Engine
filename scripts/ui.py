@@ -26,11 +26,21 @@ st.caption(
     "Visual mode: DINOv2 structural similarity."
 )
 
+MODES = [
+    "Image (CLIP, 63k)",
+    "Text metadata (MiniLM, 145k)",
+    "Visual similarity (DINOv2, 63k)",
+]
+
+if "search_mode" not in st.session_state:
+    st.session_state["search_mode"] = MODES[0]
+
 with st.sidebar:
     st.subheader("Controls")
     mode_label = st.radio(
         "Search mode",
-        ["Image (CLIP, 63k)", "Text metadata (MiniLM, 145k)", "Visual similarity (DINOv2, 63k)"],
+        MODES,
+        key="search_mode",
         help=(
             "Image: finds artworks whose pixels match the meaning of your query.\n"
             "Text: searches titles, medium, attribution, and alt-text.\n"
@@ -76,8 +86,8 @@ with st.sidebar:
 
 # ── random artwork panel ──────────────────────────────────────────────────────
 
-if "random" in st.session_state:
-    rec = st.session_state.pop("random")
+if "random" in st.session_state and st.session_state["random"]:
+    rec = st.session_state["random"]
     m = rec["metadata"]
     st.subheader("🎲 Random")
     c1, c2 = st.columns([1, 2])
@@ -89,9 +99,18 @@ if "random" in st.session_state:
         st.write(m.get("attribution") or "")
         st.write(m.get("date") or "")
         st.caption(f"{m.get('classification', '')} / {m.get('medium', '')}")
-        if st.button("🔍 Find visually similar", key="rand_similar"):
-            st.session_state["visual_seed_id"] = rec["uuid"]
-            st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("🔍 Find visually similar", key="rand_similar"):
+                st.session_state["visual_seed_id"] = rec["uuid"]
+                st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
+                st.session_state["search_mode"] = MODES[2]
+                del st.session_state["random"]
+                st.rerun()
+        with b2:
+            if st.button("✕ Dismiss", key="rand_dismiss"):
+                del st.session_state["random"]
+                st.rerun()
     st.divider()
 
 
@@ -104,8 +123,10 @@ if is_visual_mode:
     if seed_id:
         st.info(f"Seed artwork: **{seed_title}** (`{seed_id}`)")
         if st.button("✕ Clear seed"):
-            del st.session_state["visual_seed_id"]
-            del st.session_state["visual_seed_title"]
+            if "visual_seed_id" in st.session_state:
+                del st.session_state["visual_seed_id"]
+            if "visual_seed_title" in st.session_state:
+                del st.session_state["visual_seed_title"]
             st.rerun()
         try:
             with st.spinner("Searching..."):
@@ -130,6 +151,7 @@ if is_visual_mode:
                 if st.button("🔍 Find similar", key=f"vs_{hit['uuid']}"):
                     st.session_state["visual_seed_id"] = hit["uuid"]
                     st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
+                    st.session_state["search_mode"] = MODES[2]
                     st.rerun()
     else:
         st.info(
@@ -185,10 +207,10 @@ if query:
                 pred = m.get("pred_movement")
                 if pred:
                     conf = m.get("pred_confidence", 0.0)
-                    dot = "🟢" if conf >= 0.75 else ("🟡" if conf >= 0.40 else "🔴")
+                    dot = "🟢" if conf >= 0.50 else ("🟡" if conf >= 0.30 else "🔴")
                     warn = " ⚠️" if m.get("pred_anachronistic") else ""
                     st.markdown(f"{dot} **{pred.replace('_', ' ')}** `{conf:.2f}`{warn}")
-                    if conf < 0.40 and m.get("pred_alt1"):
+                    if conf < 0.30 and m.get("pred_alt1"):
                         st.caption(
                             f"or: {m['pred_alt1'].replace('_', ' ')} `{m.get('pred_alt1_conf', 0):.2f}` · "
                             f"{m.get('pred_alt2', '').replace('_', ' ')} `{m.get('pred_alt2_conf', 0):.2f}`"
@@ -196,6 +218,7 @@ if query:
                 if st.button("🔍 Find visually similar", key=f"sim_{hit['uuid']}"):
                     st.session_state["visual_seed_id"] = hit["uuid"]
                     st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
+                    st.session_state["search_mode"] = MODES[2]
                     st.rerun()
     else:
         for hit in results:
