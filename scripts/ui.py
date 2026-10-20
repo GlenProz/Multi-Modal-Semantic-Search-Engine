@@ -18,19 +18,21 @@ MOVEMENTS = [
     "post_impressionism", "realism", "renaissance", "romanticism", "surrealism",
 ]
 
-st.set_page_config(page_title="NGA Semantic Search", layout="wide")
-st.title("NGA Semantic Search")
-st.caption(
-    "National Gallery of Art open dataset — semantic search by meaning, not keywords. "
-    "Text mode: MiniLM over metadata. Image mode: CLIP ViT-B/32 over pixels. "
-    "Visual mode: DINOv2 structural similarity."
-)
-
 MODES = [
+    "Hybrid (CLIP + MiniLM)",
     "Image (CLIP, 63k)",
     "Text metadata (MiniLM, 145k)",
     "Visual similarity (DINOv2, 63k)",
 ]
+
+st.set_page_config(page_title="NGA Semantic Search", layout="wide")
+st.title("NGA Semantic Search")
+st.caption(
+    "National Gallery of Art open dataset — semantic search by meaning, not keywords. "
+    "Hybrid mode: Reciprocal Rank Fusion of pixels + metadata. "
+    "Image mode: CLIP ViT-B/32 over pixels. Text mode: MiniLM over metadata. "
+    "Visual mode: DINOv2 structural similarity."
+)
 
 if "search_mode" not in st.session_state:
     st.session_state["search_mode"] = MODES[0]
@@ -42,19 +44,21 @@ with st.sidebar:
         MODES,
         key="search_mode",
         help=(
+            "Hybrid: fuses visual CLIP search and MiniLM metadata search using RRF.\n"
             "Image: finds artworks whose pixels match the meaning of your query.\n"
             "Text: searches titles, medium, attribution, and alt-text.\n"
-            "Visual: finds artworks that *look like* a chosen piece — same composition, texture, palette."
+            "Visual: finds artworks that look like a chosen piece — same composition, texture, palette."
         ),
     )
     k = st.slider("Results", 4, 32, 12, step=4)
     cols_per_row = st.slider("Columns", 2, 6, 4)
 
+    is_hybrid_mode = mode_label.startswith("Hybrid")
     is_image_mode = mode_label.startswith("Image")
     is_visual_mode = mode_label.startswith("Visual")
     is_text_mode = mode_label.startswith("Text")
 
-    if is_image_mode:
+    if is_hybrid_mode or is_image_mode:
         st.divider()
         st.caption("**Filter by art movement**")
         selected_movements = st.multiselect(
@@ -62,6 +66,14 @@ with st.sidebar:
             options=MOVEMENTS,
             format_func=lambda m: m.replace("_", " ").title(),
         )
+        exclude_anachronistic = st.checkbox(
+            "Exclude anachronistic movement labels",
+            value=False,
+            help="Filter out artworks where the predicted movement falls outside the historical date span",
+        )
+    else:
+        selected_movements = []
+        exclude_anachronistic = False
 
     st.divider()
     if st.button("🎲 Random artwork", use_container_width=True):
@@ -104,7 +116,7 @@ if "random" in st.session_state and st.session_state["random"]:
             if st.button("🔍 Find visually similar", key="rand_similar"):
                 st.session_state["visual_seed_id"] = rec["uuid"]
                 st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
-                st.session_state["search_mode"] = MODES[2]
+                st.session_state["search_mode"] = MODES[3]
                 del st.session_state["random"]
                 st.rerun()
         with b2:
@@ -151,19 +163,19 @@ if is_visual_mode:
                 if st.button("🔍 Find similar", key=f"vs_{hit['uuid']}"):
                     st.session_state["visual_seed_id"] = hit["uuid"]
                     st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
-                    st.session_state["search_mode"] = MODES[2]
+                    st.session_state["search_mode"] = MODES[3]
                     st.rerun()
     else:
         st.info(
             "Visual similarity searches for artworks that *look like* a chosen piece — "
             "same composition, texture, or palette, not just the same subject.\n\n"
-            "To use it: run an **Image (CLIP)** search or press **🎲 Random artwork**, "
+            "To use it: run a search or press **🎲 Random artwork**, "
             "then click **🔍 Find visually similar** on any result card."
         )
     st.stop()
 
 
-# ── text / image (CLIP) search ────────────────────────────────────────────────
+# ── search input ──────────────────────────────────────────────────────────────
 
 query = st.text_input(
     "Query",
@@ -172,14 +184,19 @@ query = st.text_input(
 )
 
 if query:
-    if is_image_mode:
-        params: dict = {"q": query, "k": k}
+    if is_hybrid_mode:
+        endpoint = "/search/hybrid"
+        params: dict = {"q": query, "k": k, "exclude_anachronistic": exclude_anachronistic}
         if selected_movements:
             params["movements"] = ",".join(selected_movements)
+    elif is_image_mode:
         endpoint = "/search/images"
-    else:
         params = {"q": query, "k": k}
+        if selected_movements:
+            params["movements"] = ",".join(selected_movements)
+    else:
         endpoint = "/search/text"
+        params = {"q": query, "k": k}
 
     try:
         with st.spinner("Searching..."):
@@ -189,9 +206,9 @@ if query:
         st.stop()
 
     results = r.get("results", [])
-    st.write(f"**{len(results)}** results")
+    st.write(f"**{len(results)}** results ({mode_label})")
 
-    if is_image_mode:
+    if is_hybrid_mode or is_image_mode:
         cols = st.columns(cols_per_row)
         for i, hit in enumerate(results):
             m = hit["metadata"]
@@ -199,11 +216,14 @@ if query:
                 if m.get("iiif"):
                     st.image(m["iiif"], use_container_width=True)
                 st.markdown(f"**{m.get('title') or '(untitled)'}**")
-                st.caption(
-                    f"{m.get('attribution', '')}\n\n"
-                    f"{m.get('date', '')} · {m.get('classification', '')}\n\n"
-                    f"score: `{hit['score']:.3f}`"
-                )
+                artist_info = m.get("artists") or m.get("attribution") or ""
+                date_class = f"{m.get('date', '')} · {m.get('classification', '')}".strip(" ·")
+                score_str = f"score: `{hit['score']:.3f}`"
+                if is_hybrid_mode and hit.get("text_score") and hit.get("image_score"):
+                    score_str += f" (text: `{hit['text_score']:.2f}` / img: `{hit['image_score']:.2f}`)"
+
+                st.caption(f"{artist_info}\n\n{date_class}\n\n{score_str}")
+
                 pred = m.get("pred_movement")
                 if pred:
                     conf = m.get("pred_confidence", 0.0)
@@ -215,17 +235,23 @@ if query:
                             f"or: {m['pred_alt1'].replace('_', ' ')} `{m.get('pred_alt1_conf', 0):.2f}` · "
                             f"{m.get('pred_alt2', '').replace('_', ' ')} `{m.get('pred_alt2_conf', 0):.2f}`"
                         )
-                if st.button("🔍 Find visually similar", key=f"sim_{hit['uuid']}"):
-                    st.session_state["visual_seed_id"] = hit["uuid"]
+                card_uuid = hit.get("uuid")
+                if card_uuid and st.button("🔍 Find visually similar", key=f"sim_{card_uuid}_{i}"):
+                    st.session_state["visual_seed_id"] = card_uuid
                     st.session_state["visual_seed_title"] = m.get("title", "(untitled)")
-                    st.session_state["search_mode"] = MODES[2]
+                    st.session_state["search_mode"] = MODES[3]
                     st.rerun()
     else:
         for hit in results:
             m = hit["metadata"]
-            st.markdown(
-                f"**{m.get('title') or '(untitled)'}** — {m.get('artists', '')} "
-                f"({m.get('date', '')})  ·  score `{hit['score']:.3f}`"
-            )
-            st.caption(f"{m.get('classification', '')} / {m.get('medium', '')}  ·  id={hit['objectid']}")
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                if m.get("iiif"):
+                    st.image(m["iiif"], use_container_width=True)
+            with c2:
+                st.markdown(
+                    f"**{m.get('title') or '(untitled)'}** — {m.get('artists', '')} "
+                    f"({m.get('date', '')})  ·  score `{hit['score']:.3f}`"
+                )
+                st.caption(f"{m.get('classification', '')} / {m.get('medium', '')}  ·  id={hit.get('objectid', '')}")
             st.divider()

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim();
-  const mode = request.nextUrl.searchParams.get("mode") ?? "images";
+  const mode = request.nextUrl.searchParams.get("mode") ?? "hybrid";
   const movements = request.nextUrl.searchParams.get("movements") ?? undefined;
   const k = Number(request.nextUrl.searchParams.get("k") ?? "24");
 
@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "A query is required." }, { status: 400 });
   }
 
-  const path = mode === "text" ? "/search/text" : "/search/images";
+  const path = mode === "hybrid" ? "/search/hybrid" : mode === "text" ? "/search/text" : "/search/images";
   const params: Record<string, string | number | undefined> = { q, k };
-  // Movement filtering only applies to the image (CLIP) index.
+  // Movement filtering applies to image and hybrid indexes.
   if (mode !== "text" && movements) params.movements = movements;
 
   const result = await proxyGet(path, params);
