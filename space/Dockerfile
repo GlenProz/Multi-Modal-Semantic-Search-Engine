@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir torch==2.11.0 torchvision==0.26.0 \
         --index-url https://download.pytorch.org/whl/cpu
 
-COPY --chown=user requirements.txt .
+COPY --chown=user space/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Source and the exported parquet index. The NumPy-backed store loads the
