@@ -5,12 +5,66 @@ import { MOVEMENTS, type ImageResult, type TextResult } from "@/lib/api";
 import { ArtworkCard } from "@/components/ArtworkCard";
 
 const EXAMPLE_QUERIES = [
-  { label: "Moody European rainy day", query: "moody European rainy-day landscape" },
-  { label: "Two figures embracing", query: "two figures embracing under a tree" },
-  { label: "Impressionist harbor", query: "impressionist harbor with sailing boats at dusk" },
-  { label: "Solitary misty figure", query: "a melancholy solitary figure in an open foggy field" },
-  { label: "Baroque chiaroscuro", query: "dramatic chiaroscuro candlelit oil portrait" },
-  { label: "Art Nouveau floral", query: "ornate flowing Art Nouveau botanical floral ornament" },
+  {
+    icon: "🕯️",
+    label: "Candlelit Solitude",
+    query: "tenebrous candlelight illuminating a solitary thinker in shadows",
+    category: "Chiaroscuro & Optics",
+  },
+  {
+    icon: "🌊",
+    label: "Sublime Storm at Sea",
+    query: "raging ocean storm waves crashing against treacherous jagged cliffs",
+    category: "The Romantic Sublime",
+  },
+  {
+    icon: "💀",
+    label: "Allegorical Vanitas",
+    query: "allegorical vanitas with skull hourglass and fading blooms",
+    category: "Symbolism & Mortality",
+  },
+  {
+    icon: "🌧️",
+    label: "Wet Cobblestone Nocturne",
+    query: "misty nocturnal city street reflections on wet cobblestones",
+    category: "Atmospheric Impressionism",
+  },
+  {
+    icon: "🏛️",
+    label: "Gothic Gargoyle Perch",
+    query: "grotesque gargoyle perched high above a soaring gothic cathedral",
+    category: "Gothic & Grotesque",
+  },
+  {
+    icon: "👶",
+    label: "Maternal Tenderness",
+    query: "intimate maternal tenderness cradling a sleeping child",
+    category: "Emotional Intimacy",
+  },
+  {
+    icon: "🏰",
+    label: "Labyrinthine Vaults",
+    query: "labyrinthine vaulted stone corridors with dramatic receding perspective",
+    category: "Spatial Geometry",
+  },
+  {
+    icon: "🍂",
+    label: "Golden Hour Mist",
+    query: "golden hour haze filtering through autumn trees",
+    category: "Optics & Luminism",
+  },
+  {
+    icon: "🎻",
+    label: "Tavern Revelers",
+    query: "raucous tavern revelers singing and playing lutes and violins",
+    category: "Genre Narrative",
+  },
+  {
+    icon: "🌿",
+    label: "Overgrown Classical Ruins",
+    query: "ancient decaying classical stone ruins overtaken by wild overgrown ivy",
+    category: "Romantic Decay",
+  },
 ];
 
 type Mode = "hybrid" | "images" | "text";
@@ -23,7 +77,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("hybrid");
   const [query, setQuery] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<Set<string>>(new Set());
-  const [onlyWithImages, setOnlyWithImages] = useState(false);
+  const [onlyWithImages, setOnlyWithImages] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -335,21 +389,32 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Curated Prompt Inspirations */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-serif italic text-stone-500 dark:text-stone-400">Inspirations:</span>
-            {EXAMPLE_QUERIES.map((ex) => (
-              <button
-                key={ex.label}
-                onClick={() => {
-                  setQuery(ex.query);
-                  runSearch(ex.query, mode, selectedMovements);
-                }}
-                className="rounded-full border border-stone-200/90 bg-stone-50/70 px-3 py-1 text-stone-600 transition-colors hover:border-amber-600/40 hover:bg-amber-50/60 hover:text-amber-900 dark:border-stone-800 dark:bg-stone-800/40 dark:text-stone-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-950/30 dark:hover:text-amber-200"
-              >
-                {ex.label}
-              </button>
-            ))}
+          {/* Curated Semantic Prompt Inspirations */}
+          <div className="mt-4 flex flex-col gap-2 pt-1 border-t border-stone-100/80 dark:border-stone-800/60">
+            <div className="flex items-center justify-between">
+              <span className="font-serif text-xs italic text-stone-500 dark:text-stone-400">
+                Semantic Inspirations <span className="font-sans not-italic text-[11px] text-stone-400 dark:text-stone-500">(deep moods, lighting & narrative concepts):</span>
+              </span>
+              <span className="text-[11px] font-mono text-stone-400 dark:text-stone-500 hidden sm:inline">
+                Instant edge cache ⚡
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {EXAMPLE_QUERIES.map((ex) => (
+                <button
+                  key={ex.label}
+                  onClick={() => {
+                    setQuery(ex.query);
+                    runSearch(ex.query, mode, selectedMovements);
+                  }}
+                  title={`[${ex.category}]\nSearch query: "${ex.query}"\n(Click to explore)`}
+                  className="group flex items-center gap-1.5 rounded-full border border-stone-200/90 bg-stone-50/80 px-3 py-1 text-stone-700 transition-all hover:border-amber-600/50 hover:bg-amber-50/80 hover:text-amber-950 hover:shadow-sm dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-950/40 dark:hover:text-amber-200"
+                >
+                  <span className="text-xs transition-transform group-hover:scale-110">{ex.icon}</span>
+                  <span className="font-medium">{ex.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Movement Filter Pills (Hybrid & Visual Modes) */}
