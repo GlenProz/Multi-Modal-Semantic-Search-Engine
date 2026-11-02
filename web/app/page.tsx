@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MOVEMENTS, type ImageResult, type TextResult } from "@/lib/api";
 import { ArtworkCard } from "@/components/ArtworkCard";
 
@@ -23,6 +23,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("hybrid");
   const [query, setQuery] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<Set<string>>(new Set());
+  const [onlyWithImages, setOnlyWithImages] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,13 @@ export default function Home() {
     images: 63249,
     dino: 63249,
   });
+
+  const displayedImageResults = useMemo(() => {
+    if (mode === "hybrid" && onlyWithImages) {
+      return imageResults.filter((r) => Boolean(r.metadata?.iiif));
+    }
+    return imageResults;
+  }, [mode, onlyWithImages, imageResults]);
 
   // Probe the backend on load
   useEffect(() => {
@@ -346,31 +354,49 @@ export default function Home() {
 
           {/* Movement Filter Pills (Hybrid & Visual Modes) */}
           {mode !== "text" && (
-            <div className="mt-4 pt-3.5 border-t border-stone-100 flex flex-wrap items-center gap-1.5 dark:border-stone-800/80">
-              <span className="text-xs font-serif text-stone-500 dark:text-stone-400 mr-1">Movement filter:</span>
-              {MOVEMENTS.map((m) => {
-                const active = selectedMovements.has(m);
-                return (
+            <div className="mt-4 pt-3.5 border-t border-stone-100 flex flex-wrap items-center justify-between gap-3 dark:border-stone-800/80">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-serif text-stone-500 dark:text-stone-400 mr-1">Movement filter:</span>
+                {MOVEMENTS.map((m) => {
+                  const active = selectedMovements.has(m);
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => toggleMovement(m)}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-all ${
+                        active
+                          ? "bg-stone-900 text-stone-100 shadow-sm dark:bg-stone-100 dark:text-stone-900"
+                          : "border border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-stone-100/50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800/50"
+                      }`}
+                    >
+                      {prettyMovement(m)}
+                    </button>
+                  );
+                })}
+                {selectedMovements.size > 0 && (
                   <button
-                    key={m}
-                    onClick={() => toggleMovement(m)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-all ${
-                      active
-                        ? "bg-stone-900 text-stone-100 shadow-sm dark:bg-stone-100 dark:text-stone-900"
-                        : "border border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-stone-100/50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800/50"
-                    }`}
+                    onClick={() => setSelectedMovements(new Set())}
+                    className="ml-2 text-xs text-amber-700 underline dark:text-amber-400 hover:opacity-80"
                   >
-                    {prettyMovement(m)}
+                    Clear filters
                   </button>
-                );
-              })}
-              {selectedMovements.size > 0 && (
-                <button
-                  onClick={() => setSelectedMovements(new Set())}
-                  className="ml-2 text-xs text-amber-700 underline dark:text-amber-400 hover:opacity-80"
+                )}
+              </div>
+
+              {/* Digitized images filter (Hybrid mode) */}
+              {mode === "hybrid" && (
+                <label
+                  title="Only show artworks that have open-access digital scans (hides catalog-only records)"
+                  className="inline-flex items-center gap-2 rounded-lg border border-stone-200/90 bg-stone-50/70 px-2.5 py-1 text-xs text-stone-700 transition-colors hover:bg-stone-100 cursor-pointer select-none dark:border-stone-800 dark:bg-stone-800/40 dark:text-stone-300 dark:hover:bg-stone-800/70"
                 >
-                  Clear filters
-                </button>
+                  <input
+                    type="checkbox"
+                    checked={onlyWithImages}
+                    onChange={(e) => setOnlyWithImages(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-stone-300 text-amber-700 focus:ring-amber-600 dark:border-stone-700 dark:bg-stone-900 dark:focus:ring-amber-500"
+                  />
+                  <span>Digitized images only</span>
+                </label>
               )}
             </div>
           )}
@@ -411,19 +437,34 @@ export default function Home() {
         {/* Active Results Display */}
         {!loading && resultLabel && (
           <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between border-b border-stone-200/80 pb-3 dark:border-stone-800">
-              <h2 className="font-serif text-xl font-medium tracking-tight text-stone-800 dark:text-stone-200">
-                {resultLabel}
-              </h2>
+            <div className="flex flex-wrap items-center justify-between border-b border-stone-200/80 pb-3 gap-2 dark:border-stone-800">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="font-serif text-xl font-medium tracking-tight text-stone-800 dark:text-stone-200">
+                  {resultLabel}
+                  {mode === "hybrid" && onlyWithImages && imageResults.length > displayedImageResults.length && (
+                    <span className="ml-2 font-sans text-xs font-normal text-stone-500 dark:text-stone-400">
+                      ({imageResults.length - displayedImageResults.length} archival-only records hidden)
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                  <span className="font-medium text-stone-700 dark:text-stone-300">Match %:</span>{" "}
+                  {mode === "hybrid"
+                    ? "Normalized Reciprocal Rank Fusion combining CLIP pixel embeddings & MiniLM catalog text (hover badge on any card for exact breakdown)"
+                    : mode === "images"
+                    ? "Cosine similarity between search query & CLIP ViT-B/32 neural image embeddings"
+                    : "Cosine similarity between search query & all-MiniLM-L6-v2 museum catalog embeddings"}
+                </p>
+              </div>
               <span className="text-xs font-mono text-stone-500">
                 Mode: <span className="uppercase text-amber-700 dark:text-amber-400 font-semibold">{mode}</span>
               </span>
             </div>
 
             {/* Visual & Hybrid Grid */}
-            {mode !== "text" && imageResults.length > 0 && (
+            {mode !== "text" && displayedImageResults.length > 0 && (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {imageResults.map((r, idx) => (
+                {displayedImageResults.map((r, idx) => (
                   <ArtworkCard
                     key={r.uuid || `${r.objectid ?? "item"}-${idx}`}
                     result={r}
@@ -445,7 +486,10 @@ export default function Home() {
                       <span className="gallery-serif text-lg font-medium text-stone-900 dark:text-stone-100">
                         {r.metadata.title || "Untitled"}
                       </span>
-                      <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-mono font-medium text-stone-700 dark:bg-stone-800 dark:text-stone-300">
+                      <span
+                        title={`MiniLM Semantic Relevance: ${Math.round(r.score * 100)}%\nCosine similarity between your search query and museum catalog metadata (titles, media, artists, provenance, curatorial notes).`}
+                        className="shrink-0 cursor-help rounded-full bg-stone-100 px-2 py-0.5 text-xs font-mono font-medium text-stone-700 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+                      >
                         {Math.round(r.score * 100)}% match
                       </span>
                     </div>

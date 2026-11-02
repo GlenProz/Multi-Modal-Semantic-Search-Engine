@@ -14,10 +14,55 @@ function fullSizeUrl(iiif?: string): string {
   return iiif.replace(/\/full\/[^/]+\//, "/full/!1600,1600/");
 }
 
+export function getMatchMetrics(result: ImageResult) {
+  const isHybrid = result.text_score != null || result.image_score != null;
+
+  if (isHybrid) {
+    // Theoretical max RRF score for rank-1 in both text and visual candidate lists:
+    // w_text / (60 + 1) + w_image / (60 + 1) = 0.5/61 + 0.5/61 = 1/61 ≈ 0.016393
+    const maxRrf = 1.0 / 61.0;
+    const rawNormalized = Math.round((result.score / maxRrf) * 100);
+    const percent = Math.min(99, Math.max(1, rawNormalized));
+
+    const breakdown: string[] = [];
+    if (result.image_score != null) {
+      breakdown.push(`Visual (CLIP): ${Math.round(result.image_score * 100)}% visual similarity`);
+    } else {
+      breakdown.push(`Visual (CLIP): No top-30 visual match`);
+    }
+    if (result.text_score != null) {
+      breakdown.push(`Catalog (MiniLM): ${Math.round(result.text_score * 100)}% metadata match`);
+    } else {
+      breakdown.push(`Catalog (MiniLM): No direct catalog keyword match`);
+    }
+
+    return {
+      percent,
+      label: `${percent}% match`,
+      title: `Hybrid RRF Match: ${percent}%\n• Fused RRF Score: ${result.score.toFixed(4)}\n• ${breakdown.join("\n• ")}\n\nRanked via Reciprocal Rank Fusion combining CLIP pixel embeddings and MiniLM archival catalog text.`,
+      isHybrid: true,
+      hasImageMatch: result.image_score != null,
+      hasTextMatch: result.text_score != null,
+    };
+  }
+
+  // Pure CLIP visual search or single-score
+  const percent = Math.min(99, Math.max(1, Math.round(result.score * 100)));
+  return {
+    percent,
+    label: `${percent}% match`,
+    title: `Visual Semantic Similarity: ${percent}%\nCosine similarity between your search query and artwork pixel embeddings (OpenAI CLIP ViT-B/32).`,
+    isHybrid: false,
+    hasImageMatch: true,
+    hasTextMatch: false,
+  };
+}
+
 export function ArtworkCard({ result, onFindSimilar }: Props) {
   const m = result.metadata || {};
   const hasImage = Boolean(m.iiif);
   const fullUrl = fullSizeUrl(m.iiif);
+  const metrics = getMatchMetrics(result);
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-stone-200/80 bg-white artwork-matte transition-all duration-300 hover:-translate-y-1 hover:border-amber-700/40 hover:shadow-lg dark:border-stone-800 dark:bg-stone-900/90 dark:hover:border-amber-500/30">
@@ -51,9 +96,12 @@ export function ArtworkCard({ result, onFindSimilar }: Props) {
         )}
 
         {/* Top badges */}
-        <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center justify-between gap-1">
-          <span className="rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/90 backdrop-blur-sm">
-            {Math.round(result.score * 100)}% match
+        <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-1">
+          <span
+            title={metrics.title}
+            className="pointer-events-auto cursor-help rounded-full bg-black/75 px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-white/95 backdrop-blur-sm transition-colors hover:bg-black"
+          >
+            {metrics.label}
           </span>
           {hasImage && (
             <a
