@@ -11,14 +11,14 @@ const EXAMPLE_QUERIES = [
   "a melancholy figure alone in a field",
 ];
 
-type Mode = "images" | "text";
+type Mode = "hybrid" | "images" | "text";
 
 function prettyMovement(m: string): string {
   return m.replace(/_/g, " ");
 }
 
 export default function Home() {
-  const [mode, setMode] = useState<Mode>("images");
+  const [mode, setMode] = useState<Mode>("hybrid");
   const [query, setQuery] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<Set<string>>(new Set());
 
@@ -57,7 +57,7 @@ export default function Home() {
       setTextResults([]);
 
       const params = new URLSearchParams({ q: targetQuery, mode: targetMode });
-      if (targetMode === "images" && movements.size > 0) {
+      if (targetMode !== "text" && movements.size > 0) {
         params.set("movements", Array.from(movements).join(","));
       }
 
@@ -151,6 +151,16 @@ export default function Home() {
         {/* Mode toggle */}
         <div className="flex gap-1 self-start rounded-lg border border-black/[.08] p-1 text-sm dark:border-white/[.1]">
           <button
+            onClick={() => setMode("hybrid")}
+            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+              mode === "hybrid"
+                ? "bg-foreground text-background"
+                : "text-zinc-600 hover:bg-black/[.04] dark:text-zinc-400 dark:hover:bg-white/[.06]"
+            }`}
+          >
+            Hybrid (RRF)
+          </button>
+          <button
             onClick={() => setMode("images")}
             className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
               mode === "images"
@@ -178,9 +188,11 @@ export default function Home() {
             type="text"
             value={query}
             placeholder={
-              mode === "images"
-                ? "Describe a scene, mood, or subject…"
-                : "Search titles, media, attributions by meaning…"
+              mode === "text"
+                ? "Search titles, media, attributions by meaning…"
+                : mode === "hybrid"
+                ? "Search by combining visual mood and catalog facts…"
+                : "Describe a scene, mood, or subject…"
             }
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -195,7 +207,7 @@ export default function Home() {
           >
             {loading ? "Searching…" : "Search"}
           </button>
-          {mode === "images" && (
+          {mode !== "text" && (
             <button
               onClick={surpriseMe}
               disabled={loading}
@@ -223,8 +235,8 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Movement filter (visual mode only) */}
-        {mode === "images" && (
+        {/* Movement filter (hybrid and visual modes) */}
+        {mode !== "text" && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-zinc-500">Movement:</span>
             {MOVEMENTS.map((m) => {
