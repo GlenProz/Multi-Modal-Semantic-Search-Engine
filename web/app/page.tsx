@@ -299,7 +299,7 @@ export default function Home() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") runSearch(query, mode, selectedMovements);
                 }}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-3.5 pl-11 pr-10 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-700/20 dark:border-stone-700 dark:bg-stone-800/40 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-amber-500"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-3.5 pl-11 pr-10 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-700/20 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-amber-500 dark:focus:bg-stone-950 dark:focus:ring-amber-500/30"
               />
               {query && (
                 <button
