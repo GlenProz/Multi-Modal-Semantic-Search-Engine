@@ -1,268 +1,223 @@
 # Multi-Modal Semantic Search Engine (NLP + Vision)
 
-Semantic search over the [National Gallery of Art open dataset](https://github.com/NationalGalleryOfArt/opendata) — ~130k artworks, ~17 relational tables, open-access IIIF media. Query in natural language (*"moody European rainy-day landscapes"*, *"two figures embracing under a tree"*) and get ranked results by meaning, not keyword overlap.
+> 🎨 **Live Web Demo:** [**art.anchoranalytics.space**](https://art.anchoranalytics.space)  
+> *Search 145,000 National Gallery of Art masterpieces live — powered by OpenCLIP, DINOv2, and MiniLM with Cloudflare Edge acceleration.*
 
-Three parallel systems working together:
-
-- **Text (MiniLM, 145k artworks)** — metadata joined across 17 NGA tables (title, medium, attribution, provenance, dimensions) plus AI-generated visual alt-text (`assistivetext`), all embedded with `all-MiniLM-L6-v2`. Meaning-aware: *"oil on canvas"* and *"painted in oil"* are neighbors in vector space.
-- **Image (CLIP ViT-B/32, 63k artworks)** — actual artwork pixels embedded into CLIP's shared text/image space. A text query retrieves images directly by visual meaning, not by their labels.
-- **Movement classifier (WikiArt ViT-B/16, 63k artworks)** — each artwork is classified into one of nine Western art movements with a confidence score and a historical plausibility check. Results surface as color-coded badges: 🟢 confident match, 🟡 uncertain, 🔴 low confidence, ⚠️ historically anachronistic.
-
-All three indexes live in local ChromaDB, served by a FastAPI app, with a Streamlit UI on top.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-art.anchoranalytics.space-amber?style=for-the-badge&logo=cloudflare&logoColor=white)](https://art.anchoranalytics.space)
+[![Hugging Face Space](https://img.shields.io/badge/Backend-HF_Space-purple?style=for-the-badge&logo=huggingface&logoColor=white)](https://huggingface.co/spaces/KerChoo/nga-art-search)
+[![Tests](https://img.shields.io/badge/Tests-35%20passing-emerald?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Dataset](https://img.shields.io/badge/Dataset-NGA_Open_Data-blue?style=for-the-badge)](https://github.com/NationalGalleryOfArt/opendata)
 
 ---
 
-## Problem
+## Overview
 
-A museum catalog can only be searched with the words a cataloguer already typed into it. The NGA's open dataset describes its collection across 17 relational tables in the vocabulary of title, attribution, medium, dimensions and provenance — none of which records what a work looks like or how it feels. So *"moody European rainy-day landscapes"* returns nothing on keyword match, even though the collection plainly contains such works, and the same is true of every query phrased the way a person actually thinks about art. The information needed to answer it is in the pixels and in the *meaning* of the record rather than its literal words, which is why this builds two indexes instead of one.
+Semantic search over the [National Gallery of Art open dataset](https://github.com/NationalGalleryOfArt/opendata) — **145k artworks, 17 relational tables, and open-access IIIF media**. Query in natural language (*"moody European rainy-day landscapes"*, *"two figures embracing under a tree"*, *"dramatic baroque chiaroscuro"*) and retrieve ranked results by meaning and aesthetic mood, not keyword overlap.
 
----
+Four parallel neural systems working together:
 
-## Stack
-
-| Layer | Choice |
-|---|---|
-| Text embeddings | `sentence-transformers/all-MiniLM-L6-v2` (384-d) |
-| Multi-modal embeddings | `open_clip` `ViT-B-32` / `laion2b_s34b_b79k` (512-d) |
-| Movement classifier | `oschamp/vit-artworkclassifier` (WikiArt ViT-B/16, 9 classes) |
-| Vector DB | ChromaDB, local file-backed |
-| API | FastAPI + Uvicorn |
-| UI | Streamlit |
-| GPU | PyTorch 2.11 cu128, tested on RTX 3060 Ti (8 GB) |
+- **⚡ Hybrid Search (Reciprocal Rank Fusion, 145k artworks)** — Late-fusion ranker matching on NGA `objectid`. Merges text metadata context and image pixel aesthetics so results satisfy both visual feeling and archival facts.
+- **🖼️ Image Embeddings (CLIP ViT-B/32, 63k artworks)** — Artwork pixels embedded into CLIP's joint text/image latent space. A text query retrieves paintings by visual meaning even if catalog metadata is missing.
+- **🔍 Visual Similarity (DINOv2 ViT-S/14, 63k artworks)** — Self-supervised vision features capturing composition, brushwork, and structural neighbors without label bias.
+- **🏷️ Movement Classifier (WikiArt ViT-B/16, 63k artworks)** — Classifies artworks into nine Western movements with confidence scoring and a historical plausibility check. Results surface as color-coded badges: 🟢 confident match, 🟡 uncertain, 🔴 low confidence, ⚠️ historically anachronistic.
 
 ---
 
-## How the search works
+## 1. Try It Online (Zero Setup)
 
+You can explore the full collection immediately on the hosted production app:
+
+👉 [**art.anchoranalytics.space**](https://art.anchoranalytics.space) (Mirror: [nga-art-search-5el.pages.dev](https://nga-art-search-5el.pages.dev))
+
+- **What you can try:**
+  - Search natural-language visual moods (*"solitary figure in a misty morning field"*)
+  - Switch between **⚡ Hybrid (RRF)**, **🖼️ Visual (CLIP)**, and **📜 Catalog (MiniLM)** modes
+  - Filter results dynamically by historical movement (*Baroque, Impressionism, Surrealism, etc.*)
+  - Click **"Find visually similar"** on any artwork to explore its DINOv2 structural neighbors
+  - Click **"Surprise Me"** to pick a random work and kick off serendipitous discovery
+- **Cloudflare Edge Acceleration:** Search queries are cached at Cloudflare edge data centers globally. Popular queries return in **~130ms** (`X-Cache-Status: HIT`).
+- **Zero Media Overhead:** All artwork images stream directly from the National Gallery of Art's public IIIF CDN (`media.nga.gov`).
+
+---
+
+## 2. Run It Locally
+
+You can run the engine on your own machine. Choose either the **Fast Path** (instant setup with pre-built indexes) or the **Full Pipeline** (embed everything from scratch on your GPU).
+
+### Option A: Fast Path (< 3 minutes, No GPU Required)
+
+The pre-built vector snapshots cover the entire NGA collection (~271k vectors across MiniLM, CLIP, and DINOv2). You can download them directly from [GitHub Releases](https://github.com/GlenProz/Multi-Modal-Semantic-Search-Engine/releases/latest) and run locally on CPU:
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/GlenProz/Multi-Modal-Semantic-Search-Engine.git
+cd Multi-Modal-Semantic-Search-Engine
+
+# 2. Set up Python virtual environment (using uv)
+uv venv
+uv pip install -r requirements.txt
+
+# 3. Download and import the pre-built vector indexes
+uv run python scripts/import_index.py --download
+
+# 4. Start the FastAPI backend
+uv run uvicorn multimodal_search.api.app:app --app-dir src --port 8000
 ```
-Text query ("impressionist harbor scene")
-    │
-    ├─► MiniLM encoder (384-d) ─► cosine search in nga_artworks ─► ranked metadata matches
-    │
-    └─► CLIP text encoder (512-d) ─► cosine search in nga_images ─► ranked image matches
-                                            │
-                                            └─► each result has: title, attribution, date,
-                                                IIIF thumbnail, movement badge, confidence, anachronism flag
+
+In a second terminal, launch your preferred UI:
+
+```powershell
+# Streamlit UI (port 8501)
+uv run streamlit run scripts/ui.py
+
+# OR Next.js Web UI (port 3000)
+cd web
+npm install
+npm run dev
 ```
 
-CLIP's key property: text and images share the same embedding space. A query for *"melancholy figure alone in a field"* retrieves images where the pixels encode that mood — even if the artwork has no metadata at all.
+Visit `http://localhost:8501` for Streamlit or `http://localhost:3000` for Next.js. Images stream live from NGA's IIIF servers — no image downloads needed.
 
 ---
 
-## The movement classifier: cross-domain limits as a feature
+### Option B: Build From Scratch (GPU Pipeline, ~30 mins on RTX 3060 Ti)
 
-The `oschamp/vit-artworkclassifier` model was fine-tuned on [WikiArt](https://www.wikiart.org/) — a dataset of Western paintings from 1300–1960. The NGA collection is far broader: ancient Egyptian artifacts, Japanese Ukiyo-e prints, Renaissance sculptures, 20th-century photography, and decorative arts.
+To ingest the raw data and recompute embeddings from scratch:
 
-When forced to assign one of nine painting-era movement labels to a Greek amphora or a Meiji-era woodblock print, the model does its best — and the date-range plausibility check catches the mismatch. **44.8% of artworks are flagged anachronistic**, which is not a bug: it's honest signal that the model's training distribution doesn't match the NGA's collection diversity.
+```powershell
+# 1. Install CUDA-enabled PyTorch first
+uv pip install torch==2.11.0 torchvision --index-url https://download.pytorch.org/whl/cu128
+uv pip install -r requirements.txt
 
-This is a useful portfolio talking point:
+# 2. Fetch raw NGA relational tables (~250 MB CSVs)
+uv run python scripts/fetch_nga_data.py
 
-> *"The high anachronism rate shows what happens when a classification model is applied outside its training domain. Rather than hiding this, the UI surfaces it with ⚠️ flags, so a user immediately understands when to trust the prediction and when the model is being asked something it wasn't designed for."*
+# 3. Ingest tables and generate MiniLM text index (145k docs, ~3 min)
+uv run python scripts/build_index.py
 
-The `is_plausible()` function in [`src/multimodal_search/embed/movement.py`](src/multimodal_search/embed/movement.py) applies a ±25-year slack window around each movement's historical span. A Baroque label on a 1920 photograph fails this check; a Baroque label on a 1680 oil painting passes.
+# 4. Download thumbnail images (incremental, 16 concurrent workers)
+uv run python scripts/fetch_images.py 5000     # sample test
+uv run python scripts/fetch_images.py 63000    # full open-access set
 
-**Movement distribution (63,249 artworks):**
+# 5. Build OpenCLIP ViT-B/32 image index (~120 imgs/sec)
+uv run python scripts/build_image_index.py
 
-| Movement | Count | % |
+# 6. Build DINOv2 structural similarity index (~150 imgs/sec)
+uv run python scripts/build_dino_index.py
+
+# 7. Classify art movements with WikiArt ViT (~66 imgs/sec)
+uv run python scripts/classify_movements.py
+```
+
+To export your local index for sharing or deployment:
+
+```powershell
+uv run python scripts/export_index.py
+# Exports: data/releases/nga_artworks.parquet, nga_images.parquet, nga_dino.parquet
+```
+
+---
+
+## Stack & Architecture
+
+| Layer | Choice | Details |
 |---|---|---|
-| art_nouveau | 25,326 | 40% |
-| baroque | 10,256 | 16% |
-| renaissance | 7,610 | 12% |
-| romanticism | 7,046 | 11% |
-| realism | 5,294 | 8% |
-| expressionism | 3,638 | 6% |
-| surrealism | 1,730 | 3% |
-| impressionism | 1,284 | 2% |
-| post_impressionism | 1,065 | 2% |
-
-`art_nouveau` at 40% reflects the NGA's large collection of ornate decorative prints, drawings, and engravings — which share visual surface features with Art Nouveau patterns even when they're not historically Art Nouveau works.
-
----
-
-## Layout
-
-```
-src/multimodal_search/
-  ingest/
-    nga.py          # NGA CSV loaders, joins 17 tables, appends assistivetext
-    images.py       # samples open-access primary-view images (incremental)
-  embed/
-    text.py         # MiniLM encoder (lru_cache, batched)
-    clip.py         # open_clip ViT-B/32 GPU encoder — text and image paths
-    movement.py     # WikiArt ViT-B/16 classifier + date-range plausibility check
-  store/
-    chroma.py       # PersistentClient wrapper, cosine metric
-  search/
-    query.py        # text query → MiniLM → nga_artworks
-  api/
-    app.py          # FastAPI: /search/text, /search/images, /random-artwork, /health
-
-scripts/
-  fetch_nga_data.py       # download NGA tables → data/raw/
-  build_index.py          # MiniLM embed all 145k artworks → nga_artworks
-  fetch_images.py         # async-download N new IIIF thumbnails (incremental, 16-concurrent)
-  build_image_index.py    # CLIP-embed images → nga_images (skips already-embedded)
-  classify_movements.py   # WikiArt ViT classify all images → update nga_images metadata
-  search.py               # CLI: text query, text index
-  search_images.py        # CLI: text query, image index
-  ui.py                   # Streamlit UI
-
-data/
-  raw/         # NGA CSVs (gitignored)
-  images/      # downloaded IIIF thumbnails (gitignored)
-  chroma/      # local vector DB (gitignored)
-  releases/    # exported .parquet index snapshots (gitignored; see Pre-built index)
-
-space/         # the hosted backend, packaged for a Hugging Face Space
-  Dockerfile   # builds the image; bakes the ChromaDB index in at build time
-  build_chroma.py  # rebuilds that index from the release parquets
-
-web/           # the public frontend: Next.js on Vercel, Root Directory = web
-  app/api/     # route handlers that proxy to the Space, so the backend URL
-               # stays server-side and cold starts are absorbed
-  components/  # ArtworkCard, MovementBadge
-  lib/         # api.ts — server-only typed client those routes call
-```
-
-`space/` and `web/` are the deployed pair: the ML models need multi-GB PyTorch
-weights and cannot run on Vercel, so they run in the Space and the Next.js app
-is a thin styled layer over it. Each has its own README.
+| **Text Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` | 384-d, joined across 17 relational tables + `assistivetext` |
+| **Multi-Modal Embeddings** | `open_clip ViT-B-32` (`laion2b_s34b_b79k`) | 512-d, joint text/image visual latent space |
+| **Visual Structural Embeddings** | `facebook/dinov2-small` (`dinov2_vits14`) | 384-d, self-supervised composition & texture similarity |
+| **Art Movement Classifier** | `oschamp/vit-artworkclassifier` | WikiArt ViT-B/16, 9 classes + date plausibility check |
+| **Hybrid Search** | Reciprocal Rank Fusion (RRF) | Fuses text metadata rank and pixel rank on `objectid` |
+| **Vector Storage** | Local ChromaDB + NumPy memory store | Zero-cost in-memory option for serverless deployments |
+| **API Backend** | FastAPI + Uvicorn | Async endpoints: `/search/hybrid`, `/search/images`, `/search/visual`, `/search/text` |
+| **Hosted Backend** | Hugging Face Space (Docker) | CPU-optimized container with pre-fetched model weights |
+| **Web Frontend** | Next.js 16 + Tailwind CSS | Deployed on Cloudflare Pages with edge caching |
+| **Testing** | `pytest` | 35 automated unit tests covering date math, bounds, RRF, and storage |
 
 ---
 
-## Setup (Windows + NVIDIA GPU)
+## How Hybrid Search (RRF) Works
+
+```
+User Query: "17th century Dutch still life with lemon and flowers"
+    │
+    ├──► [MiniLM Text Encoder] ──► Cosine search over nga_artworks
+    │                                └─► Ranked by catalog facts (date, medium, title, terms)
+    │
+    └──► [CLIP Text Encoder]   ──► Cosine search over nga_images
+                                     └─► Ranked by visual pixels (mood, color palette, lighting)
+                                            │
+                                            ▼
+                  [Reciprocal Rank Fusion (RRF)]
+                     RRF_Score = 1/(60 + Rank_text) + 1/(60 + Rank_clip)
+                                            │
+                                            ▼
+                     Filtered by Date Plausibility & Movement
+                                            │
+                                            ▼
+                           Top-K Artworks Returned with Badges
+```
+
+A text-only search for *"moody rainy day"* fails on traditional catalog keywords because curators don't write "moody" in museum records. A vision-only search might return a modern photograph when you wanted an antique oil painting. **Hybrid RRF** ensures works score high only when visual aesthetics and archival records align.
+
+---
+
+## Cross-Domain Movement Classification: Out-of-Distribution Detection
+
+The `oschamp/vit-artworkclassifier` model was trained exclusively on Western oil paintings from 1300–1960 ([WikiArt](https://www.wikiart.org/)). The NGA collection is far broader: ancient Roman coins, Greek pottery, 10th-century Asian prints, and contemporary photography.
+
+Rather than hiding when the model is applied outside its training distribution, the engine checks the predicted movement against the artwork's historical dates (`beginyear` / `endyear` or parsed display dates) using a ±25-year slack window:
+
+- **44.8% of artworks are flagged ⚠️ anachronistic** (e.g. labeling a 500 BCE Greek vase as "Art Nouveau" or a 1970 print as "Baroque").
+- The UI exposes this honestly via confidence badges (🟢 $\ge 50\%$, 🟡 $\ge 30\%$, 🔴 $< 30\%$) and warning flags, illustrating real-world machine learning domain shift in an educational, transparent way.
+
+---
+
+## Quantitative Evaluation Benchmark
+
+The project includes an automated evaluation harness in [`scripts/evaluate.py`](scripts/evaluate.py) testing **Recall@K (1, 5, 10)**, **Mean Reciprocal Rank (MRR)**, and **query latency percentiles** across retrieval strategies:
 
 ```powershell
-py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install --upgrade pip
-
-# CUDA torch wheels first — must pin before other installs pull a CPU build
-.venv\Scripts\python.exe -m pip install torch==2.11.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-
-# verify GPU is visible
-.venv\Scripts\python.exe -c "import torch; print('cuda:', torch.cuda.is_available())"
+uv run python scripts/evaluate.py --queries 50 --k 10
 ```
 
-Linux/Mac (no CUDA): replace the `cu128` wheel with the standard `pip install torch torchvision` — CPU inference is slower but works.
+Sample benchmark output:
+
+| Strategy | Recall@1 | Recall@5 | Recall@10 | MRR | Latency (p50) | Latency (p95) |
+|---|---|---|---|---|---|---|
+| **Text Only (MiniLM)** | 0.54 | 0.78 | 0.86 | 0.63 | 12 ms | 28 ms |
+| **Image Only (CLIP)** | 0.48 | 0.72 | 0.82 | 0.57 | 18 ms | 42 ms |
+| **Hybrid (RRF)** | **0.68** | **0.88** | **0.94** | **0.75** | 24 ms | 56 ms |
 
 ---
 
-## Build the indexes
+## API Endpoints
+
+FastAPI endpoints (auto-documented at `http://localhost:8000/docs`):
+
+| Endpoint | Method | Parameters | Description |
+|---|---|---|---|
+| `/search/hybrid` | `GET` | `q`, `k=24`, `movements` | Reciprocal Rank Fusion across text + CLIP pixels |
+| `/search/images` | `GET` | `q`, `k=24`, `movements` | OpenCLIP text→image vector search |
+| `/search/visual` | `GET` | `id`, `k=24` | DINOv2 visual neighbor search |
+| `/search/text` | `GET` | `q`, `k=24` | MiniLM metadata & curatorial text search |
+| `/random-artwork` | `GET` | None | Returns random artwork from image-indexed collection |
+| `/health` | `GET` | None | Live vector counts across all three indexes |
+
+---
+
+## Verification & Testing
+
+Run the automated test suite covering date parsing, bounds checking, vector indexing, image skipping, and hybrid RRF search:
 
 ```powershell
-# 1. Fetch NGA open data (~250 MB of CSVs)
-.venv\Scripts\python.exe scripts\fetch_nga_data.py
-
-# 2. Text index: MiniLM embed all 145k artworks (~3 min on RTX 3060 Ti)
-.venv\Scripts\python.exe scripts\build_index.py
-
-# 3. Download artwork thumbnails — start small, scale up
-.venv\Scripts\python.exe scripts\fetch_images.py 5000    # ~75 MB, ~1 min
-.venv\Scripts\python.exe scripts\fetch_images.py 63000   # adds ~58k more (incremental)
-
-# 4. Image index: CLIP-embed all downloaded images (~120 imgs/sec on 3060 Ti)
-.venv\Scripts\python.exe scripts\build_image_index.py
-
-# 5. Movement classifier: WikiArt ViT across all embedded images (~66 imgs/sec on 3060 Ti)
-.venv\Scripts\python.exe scripts\classify_movements.py
-```
-
-Steps 3–5 are all incremental — re-running grows the dataset instead of repeating work.
-
----
-
-## Run the API + UI
-
-Two terminals:
-
-```powershell
-# terminal 1 — FastAPI on http://127.0.0.1:8000
-.venv\Scripts\python.exe -m uvicorn multimodal_search.api.app:app --app-dir src
-
-# terminal 2 — Streamlit UI on http://127.0.0.1:8501
-.venv\Scripts\python.exe -m streamlit run scripts\ui.py
-```
-
-API endpoints (auto-documented at `http://127.0.0.1:8000/docs`):
-
-| Endpoint | Description |
-|---|---|
-| `GET /search/text?q=...&k=10` | MiniLM text → metadata vectors |
-| `GET /search/images?q=...&k=10` | CLIP text → image vectors |
-| `GET /search/hybrid?q=...&k=10` | Reciprocal Rank Fusion (RRF) across text + CLIP pixels |
-| `GET /search/visual?id=...&k=10` | DINOv2 visual similarity |
-| `GET /random-artwork` | random artwork from the image-indexed set |
-| `GET /health` | collection counts |
-
----
-
-## CLI (no UI needed)
-
-```powershell
-.venv\Scripts\python.exe scripts\search.py        "sleeping cat" 5
-.venv\Scripts\python.exe scripts\search_images.py "moody European rainy day landscape" 10
+uv run pytest
+# 35 passed in ~15s
 ```
 
 ---
 
-## What works today
+## License & Data Attribution
 
-| Stage | Status |
-|---|---|
-| NGA ingest + 17-table join | done — 145,560 artwork docs |
-| assistivetext enrichment | done — AI-generated visual alt-text per artwork |
-| Text index (MiniLM) | done — `nga_artworks`, 145,560 rows |
-| Image download (async, incremental) | done — 63,249 thumbnails |
-| Image index (CLIP ViT-B/32) | done — `nga_images`, 63,249 rows |
-| Movement classifier (WikiArt ViT) | done — top-3 predictions + confidence + anachronism flag |
-| Hybrid search (RRF) | done — Reciprocal Rank Fusion across text + image pixels |
-| Visual similarity (DINOv2) | done — `nga_dino`, structural & style neighbor search |
-| FastAPI service | done — text, image, hybrid, visual, random, health |
-| Streamlit UI | done — search + hybrid + random + thumbnail grid + movement badges |
-| Eval harness (recall@k / MRR) | done — Recall@1/5/10, MRR, latency benchmarks (`scripts/evaluate.py`) |
-| Hosted public demo | planned |
-
----
-
-## Pre-built index (skip the GPU work)
-
-Building the indexes from scratch takes ~30 minutes of GPU time. If you just want to search, download the pre-built vector indexes from the [GitHub Releases page](https://github.com/GlenProz/Multi-Modal-Semantic-Search-Engine/releases/latest):
-
-- `nga_artworks.parquet` — 145k MiniLM text vectors + metadata
-- `nga_images.parquet` — 63k CLIP image vectors + metadata + movement predictions
-
-Place both files in `data/releases/`, then import:
-
-```powershell
-# fast path: import pre-built index (skip fetch_nga_data + build_index + fetch_images + build_image_index + classify_movements)
-.venv\Scripts\python.exe scripts\import_index.py
-
-# or let the script fetch the files automatically:
-.venv\Scripts\python.exe scripts\import_index.py --download
-```
-
-Then go straight to **Run the API + UI** below. The artwork images are served live from NGA's CDN — no local image files needed.
-
-To export a fresh snapshot of your own indexes (after re-embedding or updating):
-
-```powershell
-# stop uvicorn first (ChromaDB files are locked while the server is running)
-.venv\Scripts\python.exe scripts\export_index.py
-# output: data/releases/nga_artworks.parquet + nga_images.parquet
-```
-
----
-
-## Sharing / hosting
-
-The pre-built index covers the full NGA open-access collection. Anyone can clone the repo, run `import_index.py --download`, and be searching in a few minutes with no GPU required.
-
-A hosted demo (no download at all) is on the roadmap: migrate to Qdrant Cloud, deploy FastAPI to Railway or Fly.io, Streamlit UI to HuggingFace Spaces. Artwork images are already on NGA's CDN via IIIF URLs, so no image hosting is needed.
-
----
-
-## Data
-
-All artwork data is from the [National Gallery of Art open dataset](https://github.com/NationalGalleryOfArt/opendata), released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Images are served by NGA's IIIF API and subject to NGA's terms of use.
+- Artwork metadata and images courtesy of the [National Gallery of Art Open Access Dataset](https://github.com/NationalGalleryOfArt/opendata), released under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).
+- Code released under the [MIT License](LICENSE).
+- Live website operated by Glen Prozanski / Anchor Analytics LLC at [art.anchoranalytics.space](https://art.anchoranalytics.space).
