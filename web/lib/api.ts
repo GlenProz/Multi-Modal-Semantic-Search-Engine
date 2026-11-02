@@ -17,28 +17,33 @@ export const MOVEMENTS = [
 
 export type Movement = (typeof MOVEMENTS)[number];
 
-// Metadata carried by image / visual results (nga_images + nga_dino indexes).
+// Metadata carried by image / visual / hybrid results.
 export type ArtworkMeta = {
-  objectid: number;
-  title: string;
-  attribution: string;
-  date: string;
-  medium: string;
-  classification: string;
-  iiif: string;
-  pred_movement: string;
-  pred_confidence: number;
-  pred_anachronistic: boolean;
-  pred_alt1: string;
-  pred_alt1_conf: number;
-  pred_alt2: string;
-  pred_alt2_conf: number;
+  objectid?: number | string;
+  title?: string;
+  attribution?: string;
+  artists?: string;
+  date?: string;
+  medium?: string;
+  classification?: string;
+  iiif?: string;
+  pred_movement?: string;
+  pred_confidence?: number;
+  pred_anachronistic?: boolean;
+  pred_alt1?: string;
+  pred_alt1_conf?: number;
+  pred_alt2?: string;
+  pred_alt2_conf?: number;
 };
 
 export type ImageResult = {
+  objectid?: string;
   uuid: string;
   score: number;
+  text_score?: number | null;
+  image_score?: number | null;
   metadata: ArtworkMeta;
+  document?: string | null;
 };
 
 // The text index (nga_artworks, 145k) is metadata-only — no thumbnails.

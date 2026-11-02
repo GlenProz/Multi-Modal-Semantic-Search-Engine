@@ -9,45 +9,63 @@ type Props = {
 };
 
 // Swap the IIIF thumbnail size up for a larger "view full size" link.
-function fullSizeUrl(iiif: string): string {
+function fullSizeUrl(iiif?: string): string {
+  if (!iiif) return "";
   return iiif.replace(/\/full\/[^/]+\//, "/full/!1600,1600/");
 }
 
 export function ArtworkCard({ result, onFindSimilar }: Props) {
-  const m = result.metadata;
+  const m = result.metadata || {};
+  const hasImage = Boolean(m.iiif);
+  const fullUrl = fullSizeUrl(m.iiif);
+
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-stone-200/80 bg-white artwork-matte transition-all duration-300 hover:-translate-y-1 hover:border-amber-700/40 hover:shadow-lg dark:border-stone-800 dark:bg-stone-900/90 dark:hover:border-amber-500/30">
       <div className="relative block aspect-square overflow-hidden bg-stone-100 dark:bg-stone-950">
-        <a
-          href={fullSizeUrl(m.iiif)}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open high-resolution IIIF image"
-          className="block h-full w-full"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- NGA IIIF host */}
-          <img
-            src={m.iiif}
-            alt={m.title || "Artwork"}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          />
-        </a>
+        {hasImage ? (
+          <a
+            href={fullUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open high-resolution IIIF image"
+            className="block h-full w-full"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- NGA IIIF host */}
+            <img
+              src={m.iiif}
+              alt={m.title || "Artwork"}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+          </a>
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center bg-stone-100/70 p-4 text-center dark:bg-stone-950/70">
+            <span className="text-4xl opacity-30 select-none">🏛️</span>
+            <span className="mt-2 font-serif text-xs italic text-stone-600 dark:text-stone-400">
+              Archival Catalog Record
+            </span>
+            <span className="mt-0.5 text-[10px] text-stone-400 dark:text-stone-500">
+              No digital scan in NGA image set
+            </span>
+          </div>
+        )}
 
         {/* Top badges */}
         <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center justify-between gap-1">
           <span className="rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/90 backdrop-blur-sm">
             {Math.round(result.score * 100)}% match
           </span>
-          <a
-            href={fullSizeUrl(m.iiif)}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="View full resolution in new tab"
-            className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-[11px] text-white opacity-0 transition-opacity hover:bg-black/90 group-hover:opacity-100"
-          >
-            ↗
-          </a>
+          {hasImage && (
+            <a
+              href={fullUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View full resolution in new tab"
+              className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-[11px] text-white opacity-0 transition-opacity hover:bg-black/90 group-hover:opacity-100"
+            >
+              ↗
+            </a>
+          )}
         </div>
       </div>
 
@@ -57,7 +75,9 @@ export function ArtworkCard({ result, onFindSimilar }: Props) {
             {m.title || "Untitled"}
           </h3>
           <p className="line-clamp-1 text-xs text-stone-600 dark:text-stone-400">
-            <span className="font-medium text-stone-800 dark:text-stone-200">{m.attribution || "Unknown Artist"}</span>
+            <span className="font-medium text-stone-800 dark:text-stone-200">
+              {m.attribution || m.artists || "Unknown Artist"}
+            </span>
             {m.date ? ` · ${m.date}` : ""}
           </p>
           {m.medium && (
@@ -76,13 +96,19 @@ export function ArtworkCard({ result, onFindSimilar }: Props) {
             />
           ) : null}
 
-          <button
-            onClick={() => onFindSimilar(result.uuid)}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50/80 px-3 py-1.5 text-xs font-medium text-stone-700 transition-all hover:border-amber-600/50 hover:bg-amber-50/60 hover:text-amber-900 dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-950/30 dark:hover:text-amber-300"
-          >
-            <span>✦</span>
-            <span>Find visually similar</span>
-          </button>
+          {result.uuid ? (
+            <button
+              onClick={() => onFindSimilar(result.uuid)}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50/80 px-3 py-1.5 text-xs font-medium text-stone-700 transition-all hover:border-amber-600/50 hover:bg-amber-50/60 hover:text-amber-900 dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-950/30 dark:hover:text-amber-300"
+            >
+              <span>✦</span>
+              <span>Find visually similar</span>
+            </button>
+          ) : (
+            <div className="flex items-center justify-center py-1 text-[11px] italic text-stone-400 dark:text-stone-500">
+              Archival metadata match
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -423,8 +423,12 @@ export default function Home() {
             {/* Visual & Hybrid Grid */}
             {mode !== "text" && imageResults.length > 0 && (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {imageResults.map((r) => (
-                  <ArtworkCard key={r.uuid} result={r} onFindSimilar={findSimilar} />
+                {imageResults.map((r, idx) => (
+                  <ArtworkCard
+                    key={r.uuid || `${r.objectid ?? "item"}-${idx}`}
+                    result={r}
+                    onFindSimilar={findSimilar}
+                  />
                 ))}
               </div>
             )}
