@@ -206,53 +206,77 @@ export default function Home() {
       {/* Main Search Station */}
       <section className="mx-auto w-full max-w-4xl px-6 pb-8">
         <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xl shadow-stone-200/40 sm:p-6 dark:border-stone-800/90 dark:bg-stone-900/80 dark:shadow-none">
-          {/* Mode Tabs */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-4 dark:border-stone-800/80">
-            <div className="flex gap-1.5 rounded-xl bg-stone-100/80 p-1 text-xs sm:text-sm dark:bg-stone-800/60">
+          {/* Mode Tabs & Explanation */}
+          <div className="mb-4 flex flex-col gap-2.5 border-b border-stone-100 pb-4 dark:border-stone-800/80">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex gap-1.5 rounded-xl bg-stone-100/80 p-1 text-xs sm:text-sm dark:bg-stone-800/60">
+                <button
+                  onClick={() => setMode("hybrid")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-medium transition-all ${
+                    mode === "hybrid"
+                      ? "bg-white text-stone-950 shadow-sm dark:bg-stone-700 dark:text-white"
+                      : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200"
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>Hybrid (RRF)</span>
+                </button>
+                <button
+                  onClick={() => setMode("images")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-medium transition-all ${
+                    mode === "images"
+                      ? "bg-white text-stone-950 shadow-sm dark:bg-stone-700 dark:text-white"
+                      : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200"
+                  }`}
+                >
+                  <span>🖼️</span>
+                  <span>Visual (CLIP)</span>
+                </button>
+                <button
+                  onClick={() => setMode("text")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-medium transition-all ${
+                    mode === "text"
+                      ? "bg-white text-stone-950 shadow-sm dark:bg-stone-700 dark:text-white"
+                      : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200"
+                  }`}
+                >
+                  <span>📜</span>
+                  <span>Catalog (MiniLM)</span>
+                </button>
+              </div>
+
               <button
-                onClick={() => setMode("hybrid")}
-                className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-medium transition-all ${
-                  mode === "hybrid"
-                    ? "bg-white text-stone-950 shadow-sm dark:bg-stone-700 dark:text-white"
-                    : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200"
-                }`}
+                onClick={surpriseMe}
+                disabled={loading}
+                title="Pick a random artwork from the 63k image index and explore its visual neighbors"
+                className="flex items-center gap-1.5 rounded-lg border border-amber-600/30 bg-amber-50/70 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
               >
-                <span>⚡</span>
-                <span>Hybrid (RRF)</span>
-              </button>
-              <button
-                onClick={() => setMode("images")}
-                className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-medium transition-all ${
-                  mode === "images"
-                    ? "bg-white text-stone-950 shadow-sm dark:bg-stone-700 dark:text-white"
-                    : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200"
-                }`}
-              >
-                <span>🖼️</span>
-                <span>Visual (CLIP)</span>
-              </button>
-              <button
-                onClick={() => setMode("text")}
-                className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-medium transition-all ${
-                  mode === "text"
-                    ? "bg-white text-stone-950 shadow-sm dark:bg-stone-700 dark:text-white"
-                    : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200"
-                }`}
-              >
-                <span>📜</span>
-                <span>Catalog (MiniLM)</span>
+                <span>🎲</span>
+                <span>Surprise Me</span>
               </button>
             </div>
 
-            <button
-              onClick={surpriseMe}
-              disabled={loading}
-              title="Pick a random artwork from the 63k image index and explore its visual neighbors"
-              className="flex items-center gap-1.5 rounded-lg border border-amber-600/30 bg-amber-50/70 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
-            >
-              <span>🎲</span>
-              <span>Surprise Me</span>
-            </button>
+            {/* Mode Explanation */}
+            <div className="flex items-baseline gap-2 px-1 text-xs text-stone-500 dark:text-stone-400">
+              <span className="font-serif italic text-amber-800 dark:text-amber-300 shrink-0">How it works:</span>
+              <p className="leading-relaxed">
+                {mode === "hybrid" && (
+                  <>
+                    <strong className="font-medium text-stone-700 dark:text-stone-300">Reciprocal Rank Fusion (RRF)</strong> fuses pixel aesthetics with archival catalog metadata for the most balanced, meaning-aware search.
+                  </>
+                )}
+                {mode === "images" && (
+                  <>
+                    <strong className="font-medium text-stone-700 dark:text-stone-300">CLIP</strong> embeds raw artwork pixels into a joint vision/language space to retrieve visual moods, lighting, and textures without relying on manual tags.
+                  </>
+                )}
+                {mode === "text" && (
+                  <>
+                    <strong className="font-medium text-stone-700 dark:text-stone-300">MiniLM</strong> searches across 17 museum catalog tables, artist names, media, and curatorial alt-text by semantic meaning rather than exact keywords.
+                  </>
+                )}
+              </p>
+            </div>
           </div>
 
           {/* Search Input Bar */}
