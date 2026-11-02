@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MOVEMENTS, type ImageResult, type TextResult } from "@/lib/api";
 import { ArtworkCard } from "@/components/ArtworkCard";
 
@@ -78,6 +78,14 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<Set<string>>(new Set());
   const [onlyWithImages, setOnlyWithImages] = useState(true);
+  const [activeInspiration, setActiveInspiration] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+
+  const scrollToResults = useCallback(() => {
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +175,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setTextResults([]);
-    window.scrollTo({ top: 380, behavior: "smooth" });
+    scrollToResults();
 
     try {
       const res = await fetch(`/api/similar?id=${encodeURIComponent(uuid)}`);
@@ -187,6 +195,16 @@ export default function Home() {
       setLoading(false);
     }
   }, []);
+
+  const selectInspiration = useCallback(
+    (ex: (typeof EXAMPLE_QUERIES)[number]) => {
+      setQuery(ex.query);
+      setActiveInspiration(ex.label);
+      runSearch(ex.query, mode, selectedMovements);
+      scrollToResults();
+    },
+    [mode, selectedMovements, runSearch, scrollToResults]
+  );
 
   const surpriseMe = useCallback(async () => {
     setLoading(true);
@@ -357,7 +375,10 @@ export default function Home() {
                     ? "Search by scene, subject, lighting, or mood (fusing text & pixels)…"
                     : "Describe the visual scene (e.g. moody rainy street, portrait in candlelight)…"
                 }
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActiveInspiration(null);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") runSearch(query, mode, selectedMovements);
                 }}
@@ -365,7 +386,10 @@ export default function Home() {
               />
               {query && (
                 <button
-                  onClick={() => setQuery("")}
+                  onClick={() => {
+                    setQuery("");
+                    setActiveInspiration(null);
+                  }}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
                 >
                   ✕
@@ -400,20 +424,27 @@ export default function Home() {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              {EXAMPLE_QUERIES.map((ex) => (
-                <button
-                  key={ex.label}
-                  onClick={() => {
-                    setQuery(ex.query);
-                    runSearch(ex.query, mode, selectedMovements);
-                  }}
-                  title={`[${ex.category}]\nSearch query: "${ex.query}"\n(Click to explore)`}
-                  className="group flex items-center gap-1.5 rounded-full border border-stone-200/90 bg-stone-50/80 px-3 py-1 text-stone-700 transition-all hover:border-amber-600/50 hover:bg-amber-50/80 hover:text-amber-950 hover:shadow-sm dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-950/40 dark:hover:text-amber-200"
-                >
-                  <span className="text-xs transition-transform group-hover:scale-110">{ex.icon}</span>
-                  <span className="font-medium">{ex.label}</span>
-                </button>
-              ))}
+              {EXAMPLE_QUERIES.map((ex) => {
+                const isActive = activeInspiration === ex.label;
+                return (
+                  <button
+                    key={ex.label}
+                    onClick={() => selectInspiration(ex)}
+                    title={`[${ex.category}]\nSearch query: "${ex.query}"\n(Click to explore)`}
+                    className={`group flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all ${
+                      isActive
+                        ? "border border-amber-600 bg-amber-100/90 text-amber-950 shadow-sm ring-1 ring-amber-500/40 dark:border-amber-500 dark:bg-amber-950/70 dark:text-amber-200"
+                        : "border border-stone-200/90 bg-stone-50/80 text-stone-700 hover:border-amber-600/50 hover:bg-amber-50/80 hover:text-amber-950 hover:shadow-sm dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-950/40 dark:hover:text-amber-200"
+                    }`}
+                  >
+                    <span className="text-xs transition-transform group-hover:scale-110">{ex.icon}</span>
+                    <span className="font-medium">{ex.label}</span>
+                    {isActive && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-600 dark:bg-amber-400 animate-pulse" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -486,7 +517,7 @@ export default function Home() {
       </section>
 
       {/* Results or Discovery Showcase */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 pb-20">
+      <main ref={resultsRef} className="mx-auto w-full max-w-7xl flex-1 px-6 pb-20 scroll-mt-6">
         {loading && (
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-stone-300 border-t-stone-800 dark:border-stone-700 dark:border-t-amber-400" />
