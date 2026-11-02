@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "deploy": "next build && wrangler pages deploy out --project-name nga-art-search --branch main",
     "start": "next start",
     "lint": "eslint"
   },
