@@ -191,6 +191,8 @@ API endpoints (auto-documented at `http://127.0.0.1:8000/docs`):
 |---|---|
 | `GET /search/text?q=...&k=10` | MiniLM text → metadata vectors |
 | `GET /search/images?q=...&k=10` | CLIP text → image vectors |
+| `GET /search/hybrid?q=...&k=10` | Reciprocal Rank Fusion (RRF) across text + CLIP pixels |
+| `GET /search/visual?id=...&k=10` | DINOv2 visual similarity |
 | `GET /random-artwork` | random artwork from the image-indexed set |
 | `GET /health` | collection counts |
 
@@ -215,9 +217,11 @@ API endpoints (auto-documented at `http://127.0.0.1:8000/docs`):
 | Image download (async, incremental) | done — 63,249 thumbnails |
 | Image index (CLIP ViT-B/32) | done — `nga_images`, 63,249 rows |
 | Movement classifier (WikiArt ViT) | done — top-3 predictions + confidence + anachronism flag |
-| FastAPI service | done — text, image, random, health |
-| Streamlit UI | done — search + random + thumbnail grid + movement badges |
-| Eval harness (recall@k / MRR) | planned |
+| Hybrid search (RRF) | done — Reciprocal Rank Fusion across text + image pixels |
+| Visual similarity (DINOv2) | done — `nga_dino`, structural & style neighbor search |
+| FastAPI service | done — text, image, hybrid, visual, random, health |
+| Streamlit UI | done — search + hybrid + random + thumbnail grid + movement badges |
+| Eval harness (recall@k / MRR) | done — Recall@1/5/10, MRR, latency benchmarks (`scripts/evaluate.py`) |
 | Hosted public demo | planned |
 
 ---
