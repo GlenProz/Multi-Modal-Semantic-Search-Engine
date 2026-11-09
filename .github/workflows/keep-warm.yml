@@ -1,0 +1,37 @@
+name: Keep Search Backend Warm & Prime Edge Cache
+
+on:
+  schedule:
+    # Run every 6 hours at minute 23 to avoid top-of-hour GitHub Actions traffic spikes
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  keep-warm:
+    name: Ping Hugging Face & Cloudflare Edge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Search Backend Health Endpoint
+        run: |
+          echo "Pinging Hugging Face Space backend health..."
+          curl -f -s -S --max-time 60 https://kerchoo-nga-art-search.hf.space/health || echo "HF health ping finished with notice"
+
+      - name: Ping Cloudflare Keep-Warm Endpoint
+        run: |
+          echo "Pinging Cloudflare Pages keep-warm route..."
+          curl -f -s -S --max-time 60 https://art.anchoranalytics.space/api/keep-warm
+
+      - name: Prime Popular Query Caches on Cloudflare Edge
+        run: |
+          echo "Refreshing Cloudflare edge cache for showcase inspiration queries..."
+          QUERIES=(
+            "tenebrous%20candlelight%20illuminating%20a%20solitary%20thinker%20in%20shadows"
+            "raging%20ocean%20storm%20waves%20crashing%20against%20treacherous%20jagged%20cliffs"
+            "allegorical%20vanitas%20with%20skull%20hourglass%20and%20fading%20blooms"
+            "misty%20nocturnal%20city%20street%20reflections%20on%20wet%20cobblestones"
+            "ancient%20decaying%20classical%20stone%20ruins%20overtaken%20by%20wild%20overgrown%20ivy"
+          )
+          for q in "${QUERIES[@]}"; do
+            echo -n "Priming ${q:0:30}... "
+            curl -s -o /dev/null -w "status: %{http_code} (%{time_total}s)\n" --max-time 30 "https://art.anchoranalytics.space/api/search?q=${q}&mode=hybrid"
+          done
